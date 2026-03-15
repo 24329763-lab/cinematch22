@@ -4,7 +4,7 @@ import PosterCard from "@/components/PosterCard";
 import HorizontalScroll from "@/components/HorizontalScroll";
 import {
   TRENDING, FOR_YOU, LEAVING_SOON, NEW_RELEASES, NETFLIX_ORIGINALS,
-  MOVIE_BACKDROPS, MOVIE_POSTERS,
+  MOVIE_BACKDROPS,
 } from "@/lib/tmdb";
 
 const HERO = {
