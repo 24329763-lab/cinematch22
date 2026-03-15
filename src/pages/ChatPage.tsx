@@ -1,62 +1,15 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Sparkles } from "lucide-react";
-import MovieCard, { type MovieResult } from "@/components/MovieCard";
+import { Send, Sparkles, AlertCircle } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import { streamChat } from "@/lib/chat-stream";
+import { useToast } from "@/hooks/use-toast";
 
 type Message = {
   id: string;
   role: "user" | "assistant";
   content: string;
-  movies?: MovieResult[];
 };
-
-const MOCK_MOVIES: MovieResult[] = [
-  {
-    id: "1",
-    title: "O Homem das Multidões",
-    originalTitle: "The Man of the Crowd",
-    year: 2013,
-    rating: 7.2,
-    ageRating: "14+",
-    runtime: "1h 35min",
-    genres: ["Drama", "Suspense", "Experimental"],
-    aiInsight:
-      "Um retrato hipnótico de Belo Horizonte à noite. Dois trabalhadores do metrô vivem em mundos paralelos. Baseado no conto de Edgar Allan Poe, é considerado pelo r/filmes como 'o filme brasileiro mais subestimado da década.'",
-    socialProof: "94% de aprovação no r/filmes",
-    platforms: ["prime"],
-    director: "Marcelo Gomes, Cao Guimarães",
-  },
-  {
-    id: "2",
-    title: "O Som ao Redor",
-    originalTitle: "Neighboring Sounds",
-    year: 2012,
-    rating: 7.3,
-    ageRating: "16+",
-    runtime: "2h 11min",
-    genres: ["Drama", "Suspense", "Social"],
-    aiInsight:
-      "Kleber Mendonça Filho cria um suspense sociológico sobre uma rua de classe média no Recife. Os sons — alarmes, latidos, sussurros — constroem uma tensão que o Reddit compara ao 'Hereditário brasileiro.'",
-    socialProof: "Mencionado 340+ vezes no r/cinema como must-watch",
-    platforms: ["netflix", "prime"],
-    director: "Kleber Mendonça Filho",
-  },
-  {
-    id: "3",
-    title: "As Boas Maneiras",
-    originalTitle: "Good Manners",
-    year: 2017,
-    rating: 7.0,
-    ageRating: "16+",
-    runtime: "2h 15min",
-    genres: ["Terror", "Fantasia", "Drama"],
-    aiInsight:
-      "Um conto de fadas sombrio em São Paulo. Uma babá descobre que sua patroa esconde um segredo sobrenatural. O X/Twitter brasileiro elegeu como 'o filme de terror mais original do Brasil.'",
-    socialProof: "Trending no X com #CinemaBR em 2023",
-    platforms: ["disney"],
-    director: "Juliana Rojas, Marco Dutra",
-  },
-];
 
 const SUGGESTIONS = [
   "Um terror psicológico brasileiro que não seja óbvio",
@@ -71,6 +24,7 @@ const ChatPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -92,23 +46,64 @@ const ChatPage = () => {
     setInput("");
     setIsLoading(true);
 
-    // Simulate AI response
-    setTimeout(() => {
-      const assistantMsg: Message = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: `Encontrei 3 filmes que combinam com "${messageText}". Todos disponíveis agora nas suas plataformas:`,
-        movies: MOCK_MOVIES,
-      };
-      setMessages((prev) => [...prev, assistantMsg]);
+    let assistantSoFar = "";
+    const allMessages = [...messages, userMsg];
+
+    const upsertAssistant = (chunk: string) => {
+      assistantSoFar += chunk;
+      setMessages((prev) => {
+        const last = prev[prev.length - 1];
+        if (last?.role === "assistant" && last.id === "streaming") {
+          return prev.map((m, i) =>
+            i === prev.length - 1 ? { ...m, content: assistantSoFar } : m
+          );
+        }
+        return [...prev, { id: "streaming", role: "assistant", content: assistantSoFar }];
+      });
+    };
+
+    try {
+      await streamChat({
+        messages: allMessages.map((m) => ({ role: m.role, content: m.content })),
+        onDelta: upsertAssistant,
+        onDone: () => {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === "streaming" ? { ...m, id: Date.now().toString() } : m
+            )
+          );
+          setIsLoading(false);
+        },
+        onError: (error) => {
+          toast({
+            variant: "destructive",
+            title: "Erro",
+            description: error,
+          });
+          setIsLoading(false);
+        },
+      });
+    } catch (e) {
+      console.error(e);
+      toast({
+        variant: "destructive",
+        title: "Erro de conexão",
+        description: "Não foi possível conectar ao servidor.",
+      });
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   const isEmpty = messages.length === 0;
 
   return (
     <div className="flex flex-col h-[calc(100dvh-4rem)]">
+      {/* Background gradient orbs */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden -z-10">
+        <div className="absolute top-1/4 -left-32 w-64 h-64 rounded-full bg-primary/5 blur-[100px]" />
+        <div className="absolute bottom-1/3 -right-32 w-64 h-64 rounded-full bg-accent/5 blur-[100px]" />
+      </div>
+
       {/* Scrollable area */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4">
         <AnimatePresence mode="wait">
@@ -121,15 +116,15 @@ const ChatPage = () => {
               className="flex flex-col items-center justify-center h-full text-center px-4"
             >
               <motion.div
-                initial={{ scale: 0.9, opacity: 0 }}
+                initial={{ scale: 0.8, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
-                transition={{ delay: 0.1, ease: [0.2, 0.8, 0.2, 1] }}
+                transition={{ delay: 0.1, duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
               >
-                <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mb-5 mx-auto cinema-glow">
-                  <Sparkles className="text-primary" size={24} />
+                <div className="w-16 h-16 rounded-2xl gradient-primary flex items-center justify-center mb-6 mx-auto cinema-glow animate-float">
+                  <Sparkles className="text-primary-foreground" size={28} />
                 </div>
-                <h1 className="text-2xl font-bold tracking-display mb-2">
-                  O que vamos assistir?
+                <h1 className="text-3xl font-black tracking-display mb-3">
+                  <span className="gradient-text">O que vamos assistir?</span>
                 </h1>
                 <p className="text-sm text-muted-foreground max-w-xs mx-auto leading-relaxed">
                   Me diga o clima, o gênero ou até um sentimento. Eu encontro o filme certo nas suas plataformas.
@@ -137,15 +132,15 @@ const ChatPage = () => {
               </motion.div>
 
               {/* Suggestions */}
-              <div className="mt-8 flex flex-col gap-2 w-full max-w-sm">
+              <div className="mt-10 flex flex-col gap-2.5 w-full max-w-sm">
                 {SUGGESTIONS.map((s, i) => (
                   <motion.button
                     key={s}
-                    initial={{ opacity: 0, y: 8 }}
+                    initial={{ opacity: 0, y: 12 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.3 + i * 0.06, ease: [0.2, 0.8, 0.2, 1] }}
+                    transition={{ delay: 0.3 + i * 0.08, ease: [0.25, 0.46, 0.45, 0.94] }}
                     onClick={() => handleSend(s)}
-                    className="text-left text-sm px-4 py-3 rounded-xl bg-secondary/50 text-secondary-foreground hover:bg-secondary transition-colors"
+                    className="text-left text-sm px-4 py-3.5 rounded-2xl glass text-foreground/80 hover:bg-white/10 transition-all duration-300 hover:scale-[1.02]"
                   >
                     "{s}"
                   </motion.button>
@@ -159,37 +154,34 @@ const ChatPage = () => {
                   key={msg.id}
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.25, ease: [0.2, 0.8, 0.2, 1] }}
+                  transition={{ duration: 0.25, ease: [0.25, 0.46, 0.45, 0.94] }}
                 >
                   {msg.role === "user" ? (
                     <div className="flex justify-end">
-                      <div className="bg-primary/10 text-foreground px-4 py-2.5 rounded-2xl rounded-br-lg max-w-[85%] text-sm">
+                      <div className="gradient-primary text-primary-foreground px-4 py-2.5 rounded-2xl rounded-br-md max-w-[85%] text-sm shadow-lg">
                         {msg.content}
                       </div>
                     </div>
                   ) : (
-                    <div className="space-y-3">
-                      <p className="text-sm text-muted-foreground leading-relaxed">
-                        {msg.content}
-                      </p>
-                      {msg.movies?.map((movie, i) => (
-                        <MovieCard key={movie.id} movie={movie} index={i} />
-                      ))}
+                    <div className="glass rounded-2xl p-4 max-w-[90%]">
+                      <div className="prose prose-sm prose-invert max-w-none text-foreground/90 [&_strong]:text-foreground [&_h1]:text-lg [&_h2]:text-base [&_h3]:text-sm [&_p]:leading-relaxed [&_li]:text-sm [&_ul]:space-y-1">
+                        <ReactMarkdown>{msg.content}</ReactMarkdown>
+                      </div>
                     </div>
                   )}
                 </motion.div>
               ))}
 
-              {isLoading && (
+              {isLoading && messages[messages.length - 1]?.role !== "assistant" && (
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  className="flex items-center gap-2 text-sm text-muted-foreground"
+                  className="flex items-center gap-2.5 text-sm text-muted-foreground glass rounded-2xl px-4 py-3 w-fit"
                 >
-                  <div className="flex gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse-glow" />
-                    <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse-glow [animation-delay:0.2s]" />
-                    <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse-glow [animation-delay:0.4s]" />
+                  <div className="flex gap-1.5">
+                    <span className="w-2 h-2 rounded-full gradient-primary animate-pulse-glow" />
+                    <span className="w-2 h-2 rounded-full gradient-primary animate-pulse-glow [animation-delay:0.2s]" />
+                    <span className="w-2 h-2 rounded-full gradient-primary animate-pulse-glow [animation-delay:0.4s]" />
                   </div>
                   Buscando nos catálogos...
                 </motion.div>
@@ -202,19 +194,19 @@ const ChatPage = () => {
       {/* Input */}
       <div className="p-4 pb-safe">
         <div className="max-w-2xl mx-auto">
-          <div className="flex items-center gap-2 glass-surface rounded-xl px-4 py-2 focus-within:ring-1 focus-within:ring-primary/50 transition-shadow">
+          <div className="flex items-center gap-2 glass-surface rounded-2xl px-4 py-2 focus-within:ring-1 focus-within:ring-primary/50 transition-all duration-300">
             <input
               ref={inputRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSend()}
               placeholder="Descreva o que quer assistir..."
-              className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none py-2"
+              className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none py-2.5"
             />
             <button
               onClick={() => handleSend()}
               disabled={!input.trim() || isLoading}
-              className="p-2 rounded-lg bg-primary text-primary-foreground disabled:opacity-30 transition-opacity hover:opacity-90"
+              className="p-2.5 rounded-xl gradient-primary text-primary-foreground disabled:opacity-30 transition-all hover:opacity-90 cinema-glow-sm"
             >
               <Send size={16} />
             </button>

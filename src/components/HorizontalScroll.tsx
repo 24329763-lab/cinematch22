@@ -20,29 +20,29 @@ const HorizontalScroll = ({ children, className = "" }: HorizontalScrollProps) =
 
   return (
     <div className="relative group/scroll">
-      {/* Left arrow */}
       <button
         onClick={() => scroll("left")}
-        className="absolute left-0 top-0 bottom-0 z-10 w-10 bg-gradient-to-r from-background to-transparent flex items-center justify-start pl-1 opacity-0 group-hover/scroll:opacity-100 transition-opacity"
+        className="absolute left-0 top-0 bottom-0 z-10 w-12 bg-gradient-to-r from-background via-background/80 to-transparent flex items-center justify-start pl-2 opacity-0 group-hover/scroll:opacity-100 transition-opacity duration-300"
       >
-        <ChevronLeft size={20} className="text-foreground" />
+        <div className="w-8 h-8 rounded-full glass flex items-center justify-center">
+          <ChevronLeft size={16} className="text-foreground" />
+        </div>
       </button>
 
-      {/* Scroll container */}
       <div
         ref={scrollRef}
-        className={`flex gap-3 overflow-x-auto scrollbar-hide px-4 py-1 scroll-smooth ${className}`}
-        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+        className={`flex gap-4 overflow-x-auto scrollbar-hide px-5 py-2 scroll-smooth ${className}`}
       >
         {children}
       </div>
 
-      {/* Right arrow */}
       <button
         onClick={() => scroll("right")}
-        className="absolute right-0 top-0 bottom-0 z-10 w-10 bg-gradient-to-l from-background to-transparent flex items-center justify-end pr-1 opacity-0 group-hover/scroll:opacity-100 transition-opacity"
+        className="absolute right-0 top-0 bottom-0 z-10 w-12 bg-gradient-to-l from-background via-background/80 to-transparent flex items-center justify-end pr-2 opacity-0 group-hover/scroll:opacity-100 transition-opacity duration-300"
       >
-        <ChevronRight size={20} className="text-foreground" />
+        <div className="w-8 h-8 rounded-full glass flex items-center justify-center">
+          <ChevronRight size={16} className="text-foreground" />
+        </div>
       </button>
     </div>
   );

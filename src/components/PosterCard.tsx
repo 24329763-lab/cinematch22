@@ -1,91 +1,67 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Star, Play } from "lucide-react";
-import type { Platform } from "@/components/MovieCard";
+import type { MoviePoster } from "@/lib/tmdb";
 
-import poster1 from "@/assets/posters/poster-1.jpg";
-import poster2 from "@/assets/posters/poster-2.jpg";
-import poster3 from "@/assets/posters/poster-3.jpg";
-import poster4 from "@/assets/posters/poster-4.jpg";
-import poster5 from "@/assets/posters/poster-5.jpg";
-import poster6 from "@/assets/posters/poster-6.jpg";
-import poster7 from "@/assets/posters/poster-7.jpg";
-import poster8 from "@/assets/posters/poster-8.jpg";
-import poster9 from "@/assets/posters/poster-9.jpg";
-import poster10 from "@/assets/posters/poster-10.jpg";
+type Platform = "netflix" | "prime" | "disney";
 
-export const posterImages: Record<string, string> = {
-  "poster-1": poster1,
-  "poster-2": poster2,
-  "poster-3": poster3,
-  "poster-4": poster4,
-  "poster-5": poster5,
-  "poster-6": poster6,
-  "poster-7": poster7,
-  "poster-8": poster8,
-  "poster-9": poster9,
-  "poster-10": poster10,
+const platformBadge: Record<Platform, { label: string; bg: string }> = {
+  netflix: { label: "N", bg: "bg-cinema-red" },
+  prime: { label: "P", bg: "bg-cinema-gold" },
+  disney: { label: "D+", bg: "bg-cinema-blue" },
 };
-
-const platformBadge: Record<Platform, { label: string; bg: string; text: string }> = {
-  netflix: { label: "N", bg: "bg-cinema-red", text: "text-foreground" },
-  prime: { label: "P", bg: "bg-cinema-gold", text: "text-background" },
-  disney: { label: "D+", bg: "bg-cinema-blue", text: "text-foreground" },
-};
-
-export interface PosterMovie {
-  id: string;
-  title: string;
-  year: number;
-  rating: number;
-  posterKey: string;
-  platforms: Platform[];
-  genres: string[];
-  matchPercent?: number;
-}
 
 const PosterCard = ({
   movie,
   index = 0,
   size = "md",
 }: {
-  movie: PosterMovie;
+  movie: MoviePoster;
   index?: number;
   size?: "sm" | "md" | "lg" | "hero";
 }) => {
   const [hovered, setHovered] = useState(false);
+  const [imgLoaded, setImgLoaded] = useState(false);
 
   const sizeClasses = {
-    sm: "w-28 h-[168px]",
-    md: "w-36 h-[216px]",
-    lg: "w-44 h-[264px]",
-    hero: "w-64 h-[360px]",
+    sm: "w-[120px] h-[180px]",
+    md: "w-[150px] h-[225px]",
+    lg: "w-[180px] h-[270px]",
+    hero: "w-[220px] h-[330px]",
   };
 
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.95 }}
+      initial={{ opacity: 0, scale: 0.92 }}
       animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.3, delay: index * 0.05, ease: [0.2, 0.8, 0.2, 1] }}
-      className={`relative flex-shrink-0 ${sizeClasses[size]} rounded-xl overflow-hidden cursor-pointer group`}
+      transition={{ duration: 0.4, delay: index * 0.05, ease: [0.25, 0.46, 0.45, 0.94] }}
+      whileHover={{ scale: 1.05, y: -8 }}
+      className={`relative flex-shrink-0 ${sizeClasses[size]} rounded-2xl overflow-hidden cursor-pointer group`}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      style={{ boxShadow: "0 8px 30px rgba(0,0,0,0.5)" }}
     >
+      {/* Shimmer placeholder */}
+      {!imgLoaded && (
+        <div className="absolute inset-0 shimmer rounded-2xl" />
+      )}
+
       {/* Poster image */}
       <img
-        src={posterImages[movie.posterKey]}
+        src={movie.posterUrl}
         alt={movie.title}
-        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+        onLoad={() => setImgLoaded(true)}
+        className={`w-full h-full object-cover transition-all duration-700 group-hover:scale-110 ${imgLoaded ? "opacity-100" : "opacity-0"}`}
       />
 
-      {/* Platform badges - top right */}
+      {/* Platform badges */}
       <div className="absolute top-2 right-2 flex gap-1">
         {movie.platforms.map((p) => {
           const cfg = platformBadge[p];
           return (
             <span
               key={p}
-              className={`${cfg.bg} ${cfg.text} text-[9px] font-bold w-5 h-5 rounded-md flex items-center justify-center`}
+              className={`${cfg.bg} text-foreground text-[9px] font-bold w-5 h-5 rounded-md flex items-center justify-center shadow-lg`}
             >
               {cfg.label}
             </span>
@@ -93,21 +69,21 @@ const PosterCard = ({
         })}
       </div>
 
-      {/* Match percent badge */}
+      {/* Match badge */}
       {movie.matchPercent && (
         <div className="absolute top-2 left-2">
-          <span className="bg-primary/90 text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-md tabular-nums">
+          <span className="gradient-primary text-primary-foreground text-[10px] font-bold px-2 py-0.5 rounded-full tabular-nums shadow-lg">
             {movie.matchPercent}%
           </span>
         </div>
       )}
 
-      {/* Gradient overlay */}
-      <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent opacity-80" />
+      {/* Bottom gradient */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
 
-      {/* Bottom info */}
-      <div className="absolute bottom-0 left-0 right-0 p-2.5">
-        <h4 className="text-xs font-semibold leading-tight line-clamp-2 text-foreground">
+      {/* Info */}
+      <div className="absolute bottom-0 left-0 right-0 p-3">
+        <h4 className="text-xs font-semibold leading-tight line-clamp-2 text-foreground drop-shadow-lg">
           {movie.title}
         </h4>
         <div className="flex items-center gap-1.5 mt-1">
@@ -115,18 +91,19 @@ const PosterCard = ({
           <span className="text-[10px] font-semibold tabular-nums text-cinema-gold">
             {movie.rating.toFixed(1)}
           </span>
-          <span className="text-[10px] text-muted-foreground tabular-nums">{movie.year}</span>
+          <span className="text-[10px] text-foreground/60 tabular-nums">{movie.year}</span>
         </div>
       </div>
 
-      {/* Hover play overlay */}
+      {/* Hover overlay */}
       <motion.div
         initial={false}
         animate={{ opacity: hovered ? 1 : 0 }}
-        className="absolute inset-0 bg-background/40 backdrop-blur-sm flex items-center justify-center"
+        transition={{ duration: 0.2 }}
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center pointer-events-none"
       >
-        <div className="w-10 h-10 rounded-full bg-primary/90 flex items-center justify-center cinema-glow">
-          <Play size={18} className="text-primary-foreground ml-0.5" fill="currentColor" />
+        <div className="w-12 h-12 rounded-full gradient-primary flex items-center justify-center cinema-glow-sm">
+          <Play size={20} className="text-primary-foreground ml-0.5" fill="currentColor" />
         </div>
       </motion.div>
     </motion.div>
