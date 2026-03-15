@@ -39,13 +39,15 @@ export const MOVIE_POSTERS: Record<string, string> = {
   "blade-runner-2049": `${TMDB_BASE}/gajva2L0rPYkEWjzgFlBXCAVBE5.jpg`,
 };
 
-// Backdrop URLs for hero sections
+// Use w1280 for backdrops (wider images for hero banners)
+const TMDB_BACKDROP = "https://image.tmdb.org/t/p/w1280";
+
 export const MOVIE_BACKDROPS: Record<string, string> = {
-  "ainda-estou-aqui": "https://image.tmdb.org/t/p/original/raNlvAdL8gWMAXMbZu4rxjgqJbN.jpg",
-  "parasita": "https://image.tmdb.org/t/p/original/TU9Lpz2U4ZiA1WpcnhmyMGMBYzn.jpg",
-  "interestelar": "https://image.tmdb.org/t/p/original/xJHokMbljvjADYdit5fK5VQsXEG.jpg",
-  "duna-2": "https://image.tmdb.org/t/p/original/xOMo8BRK7PfcJv9JCnx7s5hj0PX.jpg",
-  "oppenheimer": "https://image.tmdb.org/t/p/original/nb3xI8XI3w4pMVZ38VijbsyBqP4.jpg",
+  "ainda-estou-aqui": `${TMDB_BACKDROP}/raNlvAdL8gWMAXMbZu4rxjgqJbN.jpg`,
+  "parasita": `${TMDB_BACKDROP}/TU9Lpz2U4ZiA1WpcnhmyMGMBYzn.jpg`,
+  "interestelar": `${TMDB_BACKDROP}/xJHokMbljvjADYdit5fK5VQsXEG.jpg`,
+  "duna-2": `${TMDB_BACKDROP}/xOMo8BRK7PfcJv9JCnx7s5hj0PX.jpg`,
+  "oppenheimer": `${TMDB_BACKDROP}/nb3xI8XI3w4pMVZ38VijbsyBqP4.jpg`,
 };
 
 export const TRENDING: MoviePoster[] = [
