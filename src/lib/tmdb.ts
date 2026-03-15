@@ -1,6 +1,6 @@
-// Real TMDB poster URLs for Brazilian market movies
-// Using w500 size for good quality on all devices
-const TMDB_BASE = "https://image.tmdb.org/t/p/w500";
+// Real movie poster URLs using media.themoviedb.org
+const TMDB_POSTER = "https://media.themoviedb.org/t/p/w440_and_h660_face";
+const TMDB_BACKDROP = "https://media.themoviedb.org/t/p/w1920_and_h800_multi_faces";
 
 export interface MoviePoster {
   id: string;
@@ -15,35 +15,29 @@ export interface MoviePoster {
   description?: string;
 }
 
-// Real poster paths from TMDB for well-known movies
 export const MOVIE_POSTERS: Record<string, string> = {
-  "ainda-estou-aqui": `${TMDB_BASE}/vHHyz4ENYAmJpLHGfKLH8CAfUbc.jpg`,
-  "cidade-de-deus": `${TMDB_BASE}/k7eYdWvhYQyRQoU2TB2A2Xu2TfC.jpg`,
-  "parasita": `${TMDB_BASE}/7IiTTgloJzvGI1TAYymCfbfl3vT.jpg`,
-  "whiplash": `${TMDB_BASE}/7fn624j5lj3xTme2SgiLCeuedOS.jpg`,
-  "bacurau": `${TMDB_BASE}/bltxDGFbQqz6YNWsVI6eZnm7cP4.jpg`,
-  "tropa-de-elite": `${TMDB_BASE}/4m6IqZNcNZbEHMn4s7p3VvTWipo.jpg`,
-  "central-do-brasil": `${TMDB_BASE}/7dwCxOYVb7mRLxov1MU3RNQKqkH.jpg`,
-  "o-auto-da-compadecida": `${TMDB_BASE}/jkKCCGlSNjGdAogx3x4fJlESpR.jpg`,
-  "interestelar": `${TMDB_BASE}/gEU2QniE6E77NI6lCU6MxlNBvIx.jpg`,
-  "o-poderoso-chefao": `${TMDB_BASE}/rSPw7tgCH9c6NqICZef4kZjFOQ5.jpg`,
-  "clube-da-luta": `${TMDB_BASE}/pMhTgvaJCajAJPzEElBOsmI3Op6.jpg`,
-  "matrix": `${TMDB_BASE}/f89U3ADr1oiB1s9GkdPOEpXUk5H.jpg`,
-  "duna-2": `${TMDB_BASE}/1pdfLvkbY9ohJlCjQH2CZjjYVvJ.jpg`,
-  "oppenheimer": `${TMDB_BASE}/8Gxv8gSFCU0XGDykEGv7zR1n2ua.jpg`,
-  "poor-things": `${TMDB_BASE}/kCGlIMHnOm8JPXq3rXM6c5wMxcT.jpg`,
-  "nosferatu": `${TMDB_BASE}/5qGIxdEO841C0tdY9nLFLKzECsd.jpg`,
-  "aquarius": `${TMDB_BASE}/9GnUJEE8fGvOTgaq8GODjdINncv.jpg`,
-  "o-som-ao-redor": `${TMDB_BASE}/1sIqe9Cl6M8InkEtFbBjVqDiMPr.jpg`,
-  "3-percent": `${TMDB_BASE}/aYwET2uhqI8fGAlOyTHlk3WGRjF.jpg`,
-  "blade-runner-2049": `${TMDB_BASE}/gajva2L0rPYkEWjzgFlBXCAVBE5.jpg`,
+  "ainda-estou-aqui": `${TMDB_POSTER}/gZnsMbhCvhzAQlKaVpeFRHYjGyb.jpg`,
+  "cidade-de-deus": `${TMDB_POSTER}/mOBGxp0e8GQ1yBMSJiZcHnNH1jz.jpg`,
+  "parasita": `${TMDB_POSTER}/7IiTTgloJzvGI1TAYymCfbfl3vT.jpg`,
+  "whiplash": `${TMDB_POSTER}/7fn624j5lj3xTme2SgiLCeuedOS.jpg`,
+  "bacurau": `${TMDB_POSTER}/1yEFzZEoBymHnBqpVDQVweYQQ7X.jpg`,
+  "tropa-de-elite": `${TMDB_POSTER}/xr01CI15zlbCbDjGMYcxFP4fVvK.jpg`,
+  "central-do-brasil": `${TMDB_POSTER}/kF3YGXV6R6KIc9mDzRHQthQYeVN.jpg`,
+  "o-auto-da-compadecida": `${TMDB_POSTER}/tqMf7I8mhzl7UGEfrN0WyGwRBBb.jpg`,
+  "interestelar": `${TMDB_POSTER}/gEU2QniE6E77NI6lCU6MxlNBvIx.jpg`,
+  "clube-da-luta": `${TMDB_POSTER}/pMhTgvaJCajAJPzEElBOsmI3Op6.jpg`,
+  "duna-2": `${TMDB_POSTER}/1pdfLvkbY9ohJlCjQH2CZjjYVvJ.jpg`,
+  "oppenheimer": `${TMDB_POSTER}/8Gxv8gSFCU0XGDykEGv7zR1n2ua.jpg`,
+  "poor-things": `${TMDB_POSTER}/kCGlIMHnOm8JPXq3rXM6c5wMxcT.jpg`,
+  "nosferatu": `${TMDB_POSTER}/pRAmSOGOeW5ybaMM4xxkYIpSi0n.jpg`,
+  "aquarius": `${TMDB_POSTER}/s5gaCbWEKnhWuMzAyX6PnhDoCyb.jpg`,
+  "o-som-ao-redor": `${TMDB_POSTER}/j5GqGvIqSe7IqKUXzDqcA0kFjaa.jpg`,
+  "3-percent": `${TMDB_POSTER}/t3pKKfBDPUGIiASqtk44IG8kgth.jpg`,
+  "blade-runner-2049": `${TMDB_POSTER}/gajva2L0rPYkEWjzgFlBXCAVBE5.jpg`,
 };
 
-// Use w1280 for backdrops (wider images for hero banners)
-const TMDB_BACKDROP = "https://image.tmdb.org/t/p/w1280";
-
 export const MOVIE_BACKDROPS: Record<string, string> = {
-  "ainda-estou-aqui": `${TMDB_BACKDROP}/raNlvAdL8gWMAXMbZu4rxjgqJbN.jpg`,
+  "ainda-estou-aqui": `${TMDB_BACKDROP}/j9uruwRe9qM8RnP758dF7ISB8Bj.jpg`,
   "parasita": `${TMDB_BACKDROP}/TU9Lpz2U4ZiA1WpcnhmyMGMBYzn.jpg`,
   "interestelar": `${TMDB_BACKDROP}/xJHokMbljvjADYdit5fK5VQsXEG.jpg`,
   "duna-2": `${TMDB_BACKDROP}/xOMo8BRK7PfcJv9JCnx7s5hj0PX.jpg`,
