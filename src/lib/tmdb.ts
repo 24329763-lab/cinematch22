@@ -1,0 +1,90 @@
+// Real TMDB poster URLs for Brazilian market movies
+// Using w500 size for good quality on all devices
+const TMDB_BASE = "https://image.tmdb.org/t/p/w500";
+
+export interface MoviePoster {
+  id: string;
+  title: string;
+  year: number;
+  rating: number;
+  posterUrl: string;
+  backdropUrl?: string;
+  platforms: ("netflix" | "prime" | "disney")[];
+  genres: string[];
+  matchPercent?: number;
+  description?: string;
+}
+
+// Real poster paths from TMDB for well-known movies
+export const MOVIE_POSTERS: Record<string, string> = {
+  "ainda-estou-aqui": `${TMDB_BASE}/vHHyz4ENYAmJpLHGfKLH8CAfUbc.jpg`,
+  "cidade-de-deus": `${TMDB_BASE}/k7eYdWvhYQyRQoU2TB2A2Xu2TfC.jpg`,
+  "parasita": `${TMDB_BASE}/7IiTTgloJzvGI1TAYymCfbfl3vT.jpg`,
+  "whiplash": `${TMDB_BASE}/7fn624j5lj3xTme2SgiLCeuedOS.jpg`,
+  "bacurau": `${TMDB_BASE}/bltxDGFbQqz6YNWsVI6eZnm7cP4.jpg`,
+  "tropa-de-elite": `${TMDB_BASE}/4m6IqZNcNZbEHMn4s7p3VvTWipo.jpg`,
+  "central-do-brasil": `${TMDB_BASE}/7dwCxOYVb7mRLxov1MU3RNQKqkH.jpg`,
+  "o-auto-da-compadecida": `${TMDB_BASE}/jkKCCGlSNjGdAogx3x4fJlESpR.jpg`,
+  "interestelar": `${TMDB_BASE}/gEU2QniE6E77NI6lCU6MxlNBvIx.jpg`,
+  "o-poderoso-chefao": `${TMDB_BASE}/rSPw7tgCH9c6NqICZef4kZjFOQ5.jpg`,
+  "clube-da-luta": `${TMDB_BASE}/pMhTgvaJCajAJPzEElBOsmI3Op6.jpg`,
+  "matrix": `${TMDB_BASE}/f89U3ADr1oiB1s9GkdPOEpXUk5H.jpg`,
+  "duna-2": `${TMDB_BASE}/1pdfLvkbY9ohJlCjQH2CZjjYVvJ.jpg`,
+  "oppenheimer": `${TMDB_BASE}/8Gxv8gSFCU0XGDykEGv7zR1n2ua.jpg`,
+  "poor-things": `${TMDB_BASE}/kCGlIMHnOm8JPXq3rXM6c5wMxcT.jpg`,
+  "nosferatu": `${TMDB_BASE}/5qGIxdEO841C0tdY9nLFLKzECsd.jpg`,
+  "aquarius": `${TMDB_BASE}/9GnUJEE8fGvOTgaq8GODjdINncv.jpg`,
+  "o-som-ao-redor": `${TMDB_BASE}/1sIqe9Cl6M8InkEtFbBjVqDiMPr.jpg`,
+  "3-percent": `${TMDB_BASE}/aYwET2uhqI8fGAlOyTHlk3WGRjF.jpg`,
+  "blade-runner-2049": `${TMDB_BASE}/gajva2L0rPYkEWjzgFlBXCAVBE5.jpg`,
+};
+
+// Backdrop URLs for hero sections
+export const MOVIE_BACKDROPS: Record<string, string> = {
+  "ainda-estou-aqui": "https://image.tmdb.org/t/p/original/raNlvAdL8gWMAXMbZu4rxjgqJbN.jpg",
+  "parasita": "https://image.tmdb.org/t/p/original/TU9Lpz2U4ZiA1WpcnhmyMGMBYzn.jpg",
+  "interestelar": "https://image.tmdb.org/t/p/original/xJHokMbljvjADYdit5fK5VQsXEG.jpg",
+  "duna-2": "https://image.tmdb.org/t/p/original/xOMo8BRK7PfcJv9JCnx7s5hj0PX.jpg",
+  "oppenheimer": "https://image.tmdb.org/t/p/original/nb3xI8XI3w4pMVZ38VijbsyBqP4.jpg",
+};
+
+export const TRENDING: MoviePoster[] = [
+  { id: "t1", title: "Ainda Estou Aqui", year: 2024, rating: 8.1, posterUrl: MOVIE_POSTERS["ainda-estou-aqui"], platforms: ["netflix"], genres: ["Drama", "Histórico"], matchPercent: 96 },
+  { id: "t2", title: "Nosferatu", year: 2024, rating: 7.8, posterUrl: MOVIE_POSTERS["nosferatu"], platforms: ["prime", "disney"], genres: ["Terror"] },
+  { id: "t3", title: "Duna: Parte 2", year: 2024, rating: 8.1, posterUrl: MOVIE_POSTERS["duna-2"], platforms: ["prime"], genres: ["Ficção Científica"], matchPercent: 89 },
+  { id: "t4", title: "Parasita", year: 2019, rating: 8.5, posterUrl: MOVIE_POSTERS["parasita"], platforms: ["netflix"], genres: ["Suspense"] },
+  { id: "t5", title: "Oppenheimer", year: 2023, rating: 8.3, posterUrl: MOVIE_POSTERS["oppenheimer"], platforms: ["prime"], genres: ["Drama", "Biografia"] },
+  { id: "t6", title: "Pobres Criaturas", year: 2023, rating: 7.9, posterUrl: MOVIE_POSTERS["poor-things"], platforms: ["disney"], genres: ["Comédia", "Drama"] },
+];
+
+export const FOR_YOU: MoviePoster[] = [
+  { id: "f1", title: "Cidade de Deus", year: 2002, rating: 8.6, posterUrl: MOVIE_POSTERS["cidade-de-deus"], platforms: ["netflix"], genres: ["Crime", "Drama"], matchPercent: 94 },
+  { id: "f2", title: "Bacurau", year: 2019, rating: 7.4, posterUrl: MOVIE_POSTERS["bacurau"], platforms: ["prime"], genres: ["Ação", "Suspense"], matchPercent: 91 },
+  { id: "f3", title: "Central do Brasil", year: 1998, rating: 8.0, posterUrl: MOVIE_POSTERS["central-do-brasil"], platforms: ["prime"], genres: ["Drama"], matchPercent: 87 },
+  { id: "f4", title: "Tropa de Elite", year: 2007, rating: 8.0, posterUrl: MOVIE_POSTERS["tropa-de-elite"], platforms: ["netflix"], genres: ["Ação", "Crime"], matchPercent: 85 },
+  { id: "f5", title: "Aquarius", year: 2016, rating: 7.5, posterUrl: MOVIE_POSTERS["aquarius"], platforms: ["prime"], genres: ["Drama"], matchPercent: 82 },
+  { id: "f6", title: "O Auto da Compadecida", year: 2000, rating: 8.3, posterUrl: MOVIE_POSTERS["o-auto-da-compadecida"], platforms: ["disney"], genres: ["Comédia"], matchPercent: 80 },
+];
+
+export const LEAVING_SOON: MoviePoster[] = [
+  { id: "l1", title: "Parasita", year: 2019, rating: 8.5, posterUrl: MOVIE_POSTERS["parasita"], platforms: ["netflix"], genres: ["Suspense"] },
+  { id: "l2", title: "Interestelar", year: 2014, rating: 8.7, posterUrl: MOVIE_POSTERS["interestelar"], platforms: ["prime"], genres: ["Ficção Científica"] },
+  { id: "l3", title: "Whiplash", year: 2014, rating: 8.5, posterUrl: MOVIE_POSTERS["whiplash"], platforms: ["netflix"], genres: ["Drama"] },
+  { id: "l4", title: "Clube da Luta", year: 1999, rating: 8.8, posterUrl: MOVIE_POSTERS["clube-da-luta"], platforms: ["disney"], genres: ["Drama", "Suspense"] },
+];
+
+export const NEW_RELEASES: MoviePoster[] = [
+  { id: "n1", title: "Duna: Parte 2", year: 2024, rating: 8.1, posterUrl: MOVIE_POSTERS["duna-2"], platforms: ["prime"], genres: ["Ficção Científica"] },
+  { id: "n2", title: "Oppenheimer", year: 2023, rating: 8.3, posterUrl: MOVIE_POSTERS["oppenheimer"], platforms: ["prime"], genres: ["Drama"] },
+  { id: "n3", title: "Pobres Criaturas", year: 2023, rating: 7.9, posterUrl: MOVIE_POSTERS["poor-things"], platforms: ["disney"], genres: ["Comédia"] },
+  { id: "n4", title: "Nosferatu", year: 2024, rating: 7.8, posterUrl: MOVIE_POSTERS["nosferatu"], platforms: ["prime"], genres: ["Terror"] },
+  { id: "n5", title: "Blade Runner 2049", year: 2017, rating: 8.0, posterUrl: MOVIE_POSTERS["blade-runner-2049"], platforms: ["netflix"], genres: ["Ficção Científica"] },
+];
+
+export const NETFLIX_ORIGINALS: MoviePoster[] = [
+  { id: "no1", title: "Ainda Estou Aqui", year: 2024, rating: 8.1, posterUrl: MOVIE_POSTERS["ainda-estou-aqui"], platforms: ["netflix"], genres: ["Drama"] },
+  { id: "no2", title: "3%", year: 2024, rating: 7.2, posterUrl: MOVIE_POSTERS["3-percent"], platforms: ["netflix"], genres: ["Ficção Científica"] },
+  { id: "no3", title: "Cidade de Deus", year: 2002, rating: 8.6, posterUrl: MOVIE_POSTERS["cidade-de-deus"], platforms: ["netflix"], genres: ["Crime"] },
+  { id: "no4", title: "Tropa de Elite", year: 2007, rating: 8.0, posterUrl: MOVIE_POSTERS["tropa-de-elite"], platforms: ["netflix"], genres: ["Ação"] },
+  { id: "no5", title: "O Som ao Redor", year: 2012, rating: 7.3, posterUrl: MOVIE_POSTERS["o-som-ao-redor"], platforms: ["netflix"], genres: ["Suspense"] },
+];
