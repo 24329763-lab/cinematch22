@@ -1,7 +1,3 @@
-// Real movie poster URLs using media.themoviedb.org
-const TMDB_POSTER = "https://media.themoviedb.org/t/p/w440_and_h660_face";
-const TMDB_BACKDROP = "https://media.themoviedb.org/t/p/w1920_and_h800_multi_faces";
-
 export interface MoviePoster {
   id: string;
   title: string;
@@ -15,33 +11,32 @@ export interface MoviePoster {
   description?: string;
 }
 
+// All posters stored locally in /public/posters/
+const P = "/posters";
+
 export const MOVIE_POSTERS: Record<string, string> = {
-  "ainda-estou-aqui": `${TMDB_POSTER}/gZnsMbhCvhzAQlKaVpeFRHYjGyb.jpg`,
-  "cidade-de-deus": `${TMDB_POSTER}/mOBGxp0e8GQ1yBMSJiZcHnNH1jz.jpg`,
-  "parasita": `${TMDB_POSTER}/7IiTTgloJzvGI1TAYymCfbfl3vT.jpg`,
-  "whiplash": `${TMDB_POSTER}/7fn624j5lj3xTme2SgiLCeuedOS.jpg`,
-  "bacurau": `${TMDB_POSTER}/1yEFzZEoBymHnBqpVDQVweYQQ7X.jpg`,
-  "tropa-de-elite": `${TMDB_POSTER}/xr01CI15zlbCbDjGMYcxFP4fVvK.jpg`,
-  "central-do-brasil": `${TMDB_POSTER}/kF3YGXV6R6KIc9mDzRHQthQYeVN.jpg`,
-  "o-auto-da-compadecida": `${TMDB_POSTER}/tqMf7I8mhzl7UGEfrN0WyGwRBBb.jpg`,
-  "interestelar": `${TMDB_POSTER}/gEU2QniE6E77NI6lCU6MxlNBvIx.jpg`,
-  "clube-da-luta": `${TMDB_POSTER}/pMhTgvaJCajAJPzEElBOsmI3Op6.jpg`,
-  "duna-2": `${TMDB_POSTER}/1pdfLvkbY9ohJlCjQH2CZjjYVvJ.jpg`,
-  "oppenheimer": `${TMDB_POSTER}/8Gxv8gSFCU0XGDykEGv7zR1n2ua.jpg`,
-  "poor-things": `${TMDB_POSTER}/kCGlIMHnOm8JPXq3rXM6c5wMxcT.jpg`,
-  "nosferatu": `${TMDB_POSTER}/pRAmSOGOeW5ybaMM4xxkYIpSi0n.jpg`,
-  "aquarius": `${TMDB_POSTER}/s5gaCbWEKnhWuMzAyX6PnhDoCyb.jpg`,
-  "o-som-ao-redor": `${TMDB_POSTER}/j5GqGvIqSe7IqKUXzDqcA0kFjaa.jpg`,
-  "3-percent": `${TMDB_POSTER}/t3pKKfBDPUGIiASqtk44IG8kgth.jpg`,
-  "blade-runner-2049": `${TMDB_POSTER}/gajva2L0rPYkEWjzgFlBXCAVBE5.jpg`,
+  "ainda-estou-aqui": `${P}/ainda-estou-aqui.jpg`,
+  "cidade-de-deus": `${P}/cidade-de-deus.jpg`,
+  "parasita": `${P}/parasita.jpg`,
+  "whiplash": `${P}/whiplash.jpg`,
+  "bacurau": `${P}/bacurau.jpg`,
+  "tropa-de-elite": `${P}/tropa-de-elite.jpg`,
+  "central-do-brasil": `${P}/central-do-brasil.jpg`,
+  "o-auto-da-compadecida": `${P}/o-auto-da-compadecida.jpg`,
+  "interestelar": `${P}/interestelar.jpg`,
+  "clube-da-luta": `${P}/clube-da-luta.jpg`,
+  "duna-2": `${P}/duna-2.jpg`,
+  "oppenheimer": `${P}/oppenheimer.jpg`,
+  "poor-things": `${P}/poor-things.jpg`,
+  "nosferatu": `${P}/nosferatu.jpg`,
+  "aquarius": `${P}/aquarius.jpg`,
+  "o-som-ao-redor": `${P}/o-som-ao-redor.jpg`,
+  "3-percent": `${P}/3-percent.jpg`,
+  "blade-runner-2049": `${P}/blade-runner-2049.jpg`,
 };
 
 export const MOVIE_BACKDROPS: Record<string, string> = {
-  "ainda-estou-aqui": `${TMDB_BACKDROP}/j9uruwRe9qM8RnP758dF7ISB8Bj.jpg`,
-  "parasita": `${TMDB_BACKDROP}/TU9Lpz2U4ZiA1WpcnhmyMGMBYzn.jpg`,
-  "interestelar": `${TMDB_BACKDROP}/xJHokMbljvjADYdit5fK5VQsXEG.jpg`,
-  "duna-2": `${TMDB_BACKDROP}/xOMo8BRK7PfcJv9JCnx7s5hj0PX.jpg`,
-  "oppenheimer": `${TMDB_BACKDROP}/nb3xI8XI3w4pMVZ38VijbsyBqP4.jpg`,
+  "ainda-estou-aqui": `${P}/ainda-estou-aqui-backdrop.jpg`,
 };
 
 export const TRENDING: MoviePoster[] = [
