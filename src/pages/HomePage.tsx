@@ -14,7 +14,7 @@ const HERO = {
   genres: ["Drama", "Histórico"],
   description: "Fernanda Torres em performance aclamada mundialmente. Baseado na história real de Eunice Paiva durante a ditadura militar brasileira.",
   backdropUrl: MOVIE_BACKDROPS["ainda-estou-aqui"] || "/posters/ainda-estou-aqui-backdrop.jpg",
-  posterUrl: MOVIE_POSTERS["ainda-estou-aqui"],
+  posterUrl: "/posters/ainda-estou-aqui.jpg",
 };
 
 const SectionHeader = ({
