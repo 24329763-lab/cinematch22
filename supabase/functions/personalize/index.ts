@@ -171,10 +171,13 @@ CONTEXTO:
 - Já assistidos: ${watchedTitles}
 - Plataformas: ${profile?.platforms?.join(", ") || "Netflix, Prime Video, Disney+"}
 
-TAREFA: Gere 3 seções personalizadas, cada uma com **8 filmes REAIS**.
-- Títulos das seções refletem o gosto do usuário
+TAREFA: Gere 3 seções personalizadas, cada uma com **8 filmes REAIS** de qualquer país/língua.
+- Cada seção deve explorar um ASPECTO DIFERENTE do gosto do usuário (ex: um gênero, um tema, um mood, uma era diferente)
+- Títulos das seções refletem esses aspectos diferentes
+- NÃO forçar filmes brasileiros a menos que o perfil do usuário demonstre gostar especificamente de cinema brasileiro
 - NÃO repetir filmes entre seções
 - NÃO incluir filmes já assistidos
+- Explore filmes internacionais variados (Hollywood, europeus, asiáticos, etc.) que COMBINEM com o perfil
 - matchPercent: 55-98 baseado no taste note real
 - Cada filme DEVE ter o campo "tmdb_title" com o título original/internacional para busca no TMDB
 
