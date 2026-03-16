@@ -228,10 +228,10 @@ const ProfilePage = () => {
       const codeToSearch = inviteCode.toUpperCase().trim();
       
       // Look up profile by friend_code
-      const { data: targetProfiles, error: lookupError } = await supabase
+      const { data: targetProfiles, error: lookupError } = await (supabase
         .from("profiles")
-        .select("user_id, display_name")
-        .eq("friend_code" as any, codeToSearch);
+        .select("user_id, display_name") as any)
+        .eq("friend_code", codeToSearch);
 
       if (lookupError) {
         console.error("Lookup error:", lookupError);
