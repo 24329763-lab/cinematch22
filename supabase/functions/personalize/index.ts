@@ -21,7 +21,6 @@ serve(async (req) => {
     const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
     if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY not configured");
 
-    // Get user from token
     const userClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
     });
@@ -38,15 +37,17 @@ serve(async (req) => {
       .order("created_at", { ascending: false })
       .limit(200);
 
-    // Get existing cached recs
+    const signalCount = signals?.length || 0;
+
+    // Check cache - only use if signal count hasn't changed
     const { data: existingRecs } = await serviceClient
       .from("home_recommendations")
       .select("*")
       .eq("user_id", user.id)
       .single();
 
-    const signalCount = signals?.length || 0;
     if (existingRecs && existingRecs.signals_count === signalCount && signalCount > 0) {
+      console.log("Returning cached recommendations (signals unchanged)");
       return new Response(JSON.stringify(existingRecs), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -58,79 +59,55 @@ serve(async (req) => {
       });
     }
 
-    // Get user's profile for extra context
-    const { data: profile } = await serviceClient
-      .from("profiles").select("*").eq("user_id", user.id).single();
+    // Build the "Taste Note" — structured text profile from all signals
+    const tasteNote = buildTasteNote(signals);
+    console.log("Taste Note:", tasteNote);
 
-    const [{ data: watchlist }, { data: watched }] = await Promise.all([
+    // Get watchlist + watched for extra context
+    const [{ data: watchlist }, { data: watched }, { data: profile }] = await Promise.all([
       serviceClient.from("watchlist").select("title, genres, year, rating").eq("user_id", user.id).limit(50),
       serviceClient.from("watched").select("title, genres, year, user_rating").eq("user_id", user.id).limit(50),
+      serviceClient.from("profiles").select("*").eq("user_id", user.id).single(),
     ]);
 
-    const signalSummary = signals.map(s =>
-      `${s.signal_type}: ${s.category}="${s.value}" (confiança: ${s.confidence}, fonte: ${s.source})`
-    ).join("\n");
+    const watchlistTitles = watchlist?.map(w => w.title).join(", ") || "vazia";
+    const watchedTitles = watched?.map(w => `${w.title}${w.user_rating ? ` (${w.user_rating}★)` : ""}`).join(", ") || "vazio";
 
-    const watchlistSummary = watchlist?.map(w => `${w.title} (${w.year}) [${w.genres?.join(", ")}]`).join(", ") || "vazia";
-    const watchedSummary = watched?.map(w => `${w.title} (${w.year}) nota:${w.user_rating || "?"}`).join(", ") || "vazio";
+    const prompt = `Você é um sistema de recomendação de filmes. Use o PERFIL DE GOSTO abaixo para gerar recomendações 100% PERSONALIZADAS.
 
-    const profileContext = profile ? `
-Gêneros favoritos: ${profile.favorite_genres?.join(", ") || "não definidos"}
-Humor preferido: ${profile.preferred_mood || "não definido"}
-Era preferida: ${profile.preferred_era || "não definida"}
-Origem preferida: ${profile.preferred_origin || "não definida"}
-Plataformas: ${profile.platforms?.join(", ") || "todas"}
-` : "";
+=== PERFIL DE GOSTO (Taste Note) ===
+${tasteNote}
 
-    const prompt = `Você é um sistema de recomendação de filmes. Analise o perfil de gosto deste usuário e gere recomendações PERSONALIZADAS.
+=== WATCHLIST ===
+${watchlistTitles}
 
-SINAIS DE GOSTO DO USUÁRIO:
-${signalSummary}
+=== JÁ ASSISTIDOS ===
+${watchedTitles}
 
-PERFIL:
-${profileContext}
+=== PLATAFORMAS ===
+${profile?.platforms?.join(", ") || "Netflix, Prime Video, Disney+"}
 
-WATCHLIST: ${watchlistSummary}
-ASSISTIDOS: ${watchedSummary}
+TAREFA: Gere exatamente 4 seções para a home page. Os TÍTULOS das seções devem ser criativos e refletir o gosto específico do usuário (ex: se gosta de terror → "Noites Sem Dormir", se gosta de drama → "Emoções à Flor da Pele").
 
-TAREFA: Gere exatamente 4 seções de recomendação para a home page, cada uma com 5-6 filmes REAIS.
+Cada seção com 5-6 filmes REAIS.
 
-REGRAS CRÍTICAS:
-- APENAS filmes REAIS que existem de verdade
-- Filmes devem estar disponíveis em Netflix, Prime Video ou Disney+ no Brasil
+REGRAS:
+- APENAS filmes REAIS
 - NÃO repita filmes entre seções
-- NÃO inclua filmes que o usuário já assistiu
-- Cada filme deve ter: title, year, rating (IMDB aproximado), genres (em português), platforms (netflix/prime/disney), description (1 frase em PT-BR), matchPercent (60-99 baseado na compatibilidade real)
+- NÃO inclua filmes já assistidos
+- Cada filme: title, year, rating (IMDB), genres (PT-BR), platforms (netflix/prime/disney), description (1 frase PT-BR), matchPercent (60-99)
+- Os títulos das seções DEVEM ser personalizados ao perfil, NUNCA genéricos
 
-SEÇÕES OBRIGATÓRIAS (adapte títulos ao gosto do usuário):
-1. "Perfeito pra Você" — filmes com maior match baseado nos sinais
-2. Uma seção temática baseada no padrão mais forte (ex: "Thrillers Psicológicos" se curte suspense)
-3. "Expandindo Horizontes" — filmes que o usuário PODE curtir mas são de gêneros/estilos que ainda não explorou
-4. "Clássicos Essenciais" — obras importantes que combinam com o perfil
-
-Também gere um taste_summary de 1-2 frases descrevendo o perfil de gosto do usuário em PT-BR.
-
-Responda APENAS em JSON válido:
+Responda APENAS em JSON:
 {
-  "taste_summary": "...",
+  "taste_summary": "1-2 frases descrevendo o perfil de gosto em PT-BR",
   "sections": [
     {
-      "key": "for-you",
-      "title": "...",
-      "subtitle": "...",
+      "key": "section-1",
+      "title": "Título Criativo Personalizado",
+      "subtitle": "porque você curte X",
       "icon": "heart|flame|compass|star",
-      "movies": [
-        {
-          "id": "slug-do-filme",
-          "title": "...",
-          "year": 2024,
-          "rating": 8.1,
-          "genres": ["Drama"],
-          "platforms": ["netflix"],
-          "description": "...",
-          "matchPercent": 95
-        }
-      ]
+      "movies": [{"id": "slug", "title": "...", "year": 2024, "rating": 8.1, "genres": ["Drama"], "platforms": ["netflix"], "description": "...", "matchPercent": 95}]
     }
   ]
 }`;
@@ -168,6 +145,8 @@ Responda APENAS em JSON válido:
       signals_count: signalCount,
     }, { onConflict: "user_id" });
 
+    console.log(`Generated personalized home for user ${user.id} with ${signalCount} signals`);
+
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
@@ -179,3 +158,36 @@ Responda APENAS em JSON válido:
     );
   }
 });
+
+/**
+ * Build a structured "Taste Note" from raw taste signals.
+ * Groups by category and summarizes into readable text.
+ */
+function buildTasteNote(signals: any[]): string {
+  const groups: Record<string, { likes: string[]; dislikes: string[]; preferences: string[] }> = {};
+
+  for (const s of signals) {
+    const cat = s.category;
+    if (!groups[cat]) groups[cat] = { likes: [], dislikes: [], preferences: [] };
+
+    const val = `${s.value} (confiança: ${s.confidence})`;
+    if (s.signal_type === "like" || s.signal_type === "interest") {
+      if (!groups[cat].likes.includes(s.value)) groups[cat].likes.push(s.value);
+    } else if (s.signal_type === "dislike" || s.signal_type === "avoid") {
+      if (!groups[cat].dislikes.includes(s.value)) groups[cat].dislikes.push(s.value);
+    } else if (s.signal_type === "preference") {
+      if (!groups[cat].preferences.includes(s.value)) groups[cat].preferences.push(s.value);
+    }
+  }
+
+  const lines: string[] = [];
+  for (const [category, data] of Object.entries(groups)) {
+    const parts: string[] = [];
+    if (data.likes.length) parts.push(`gosta: ${data.likes.join(", ")}`);
+    if (data.dislikes.length) parts.push(`não gosta: ${data.dislikes.join(", ")}`);
+    if (data.preferences.length) parts.push(`prefere: ${data.preferences.join(", ")}`);
+    if (parts.length) lines.push(`[${category.toUpperCase()}] ${parts.join(" | ")}`);
+  }
+
+  return lines.join("\n") || "Nenhum sinal de gosto capturado ainda.";
+}
