@@ -115,14 +115,22 @@ const HomePage = () => {
             </HorizontalScroll>
           </section>
 
-          <section className="mt-10">
-            <SectionHeader icon={Heart} title="Feito pra Você" subtitle="baseado no seu perfil" />
-            <HorizontalScroll>
-              {FOR_YOU.map((movie, i) => (
-                <PosterCard key={movie.id} movie={movie} index={i} onSelect={setSelectedMovie} />
-              ))}
-            </HorizontalScroll>
-          </section>
+          {!user ? (
+            <section className="mt-10">
+              <SectionHeader icon={Heart} title="Feito pra Você" subtitle="baseado no seu perfil" />
+              <HorizontalScroll>
+                {FOR_YOU.map((movie, i) => (
+                  <PosterCard key={movie.id} movie={movie} index={i} onSelect={setSelectedMovie} />
+                ))}
+              </HorizontalScroll>
+            </section>
+          ) : (
+            <div className="mx-5 mt-10 glass rounded-2xl p-4">
+              <p className="text-sm text-foreground/80">
+                Estamos aprendendo seu gosto no chat para montar recomendações personalizadas de verdade.
+              </p>
+            </div>
+          )}
 
           <section className="mt-10">
             <SectionHeader icon={Clock} title="Saindo em Breve" subtitle="últimos dias" />

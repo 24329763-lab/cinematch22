@@ -7,9 +7,27 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+type SignalType = "like" | "dislike" | "preference" | "interest" | "avoid";
+
+type TasteSignal = {
+  signal_type: SignalType;
+  category: string;
+  value: string;
+  confidence?: number;
+};
+
+type ChatTasteExtraction = {
+  taste_note: string;
+  likes: string[];
+  dislikes: string[];
+  preferences: string[];
+  signals: TasteSignal[];
+};
+
 serve(async (req) => {
-  if (req.method === "OPTIONS")
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
+  }
 
   try {
     const authHeader = req.headers.get("Authorization");
@@ -24,90 +42,143 @@ serve(async (req) => {
     const userClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
     });
-    const { data: { user }, error: authError } = await userClient.auth.getUser();
+
+    const {
+      data: { user },
+      error: authError,
+    } = await userClient.auth.getUser();
+
     if (authError || !user) throw new Error("Unauthorized");
 
     const serviceClient = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Get taste signals
-    const { data: signals } = await serviceClient
-      .from("taste_signals")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(200);
+    const [{ data: signals }, { data: profile }, { data: watchlist }, { data: watched }, userMessages] =
+      await Promise.all([
+        serviceClient
+          .from("taste_signals")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(200),
+        serviceClient.from("profiles").select("*").eq("user_id", user.id).single(),
+        serviceClient.from("watchlist").select("title, genres, year, rating").eq("user_id", user.id).limit(50),
+        serviceClient.from("watched").select("title, genres, year, user_rating").eq("user_id", user.id).limit(50),
+        fetchRecentUserMessages(serviceClient, user.id),
+      ]);
 
-    const signalCount = signals?.length || 0;
+    const signalRows = (signals || []) as TasteSignal[];
+    const signalCount = signalRows.length;
+    const profileVersion = signalCount * 1000 + userMessages.length * 10 + (watchlist?.length || 0) + (watched?.length || 0);
 
-    // Check cache - only use if signal count hasn't changed
     const { data: existingRecs } = await serviceClient
       .from("home_recommendations")
       .select("*")
       .eq("user_id", user.id)
       .single();
 
-    if (existingRecs && existingRecs.signals_count === signalCount && signalCount > 0) {
-      console.log("Returning cached recommendations (signals unchanged)");
+    if (existingRecs && existingRecs.signals_count === profileVersion && profileVersion > 0) {
       return new Response(JSON.stringify(existingRecs), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    if (!signals || signals.length === 0) {
+    let tasteNote = "";
+    let tasteSignals: TasteSignal[] = [...signalRows];
+
+    if (signalRows.length > 0) {
+      tasteNote = buildTasteNoteFromSignals(signalRows);
+    }
+
+    // Fallback: derive taste note from chat history when taste_signals is empty
+    if (!tasteNote && userMessages.length > 0) {
+      const extracted = await extractTasteFromChat(userMessages, GEMINI_API_KEY);
+      tasteNote = extracted.taste_note;
+      tasteSignals = extracted.signals?.length ? extracted.signals : tasteSignals;
+
+      // Optional backfill so future requests are cheaper
+      if (signalRows.length === 0 && extracted.signals?.length) {
+        const uniqueSignals = dedupeSignals(extracted.signals);
+        if (uniqueSignals.length > 0) {
+          await serviceClient.from("taste_signals").insert(
+            uniqueSignals.map((s) => ({
+              user_id: user.id,
+              signal_type: s.signal_type,
+              category: s.category,
+              value: s.value,
+              confidence: s.confidence ?? 0.72,
+              source: "chat_history",
+            })),
+          );
+        }
+      }
+    }
+
+    // Last fallback from explicit user lists
+    if (!tasteNote) {
+      const watchedSummary = watched
+        ?.map((w) => `${w.title}${w.user_rating ? ` (${w.user_rating}★)` : ""}`)
+        .join(", ");
+      const watchlistSummary = watchlist?.map((w) => w.title).join(", ");
+      tasteNote = [
+        watchedSummary ? `Assistidos: ${watchedSummary}` : "",
+        watchlistSummary ? `Watchlist: ${watchlistSummary}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n");
+    }
+
+    if (!tasteNote.trim()) {
       return new Response(JSON.stringify({ sections: [], taste_summary: null }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Build the "Taste Note" — structured text profile from all signals
-    const tasteNote = buildTasteNote(signals);
-    console.log("Taste Note:", tasteNote);
+    const watchlistTitles = watchlist?.map((w) => w.title).join(", ") || "vazia";
+    const watchedTitles = watched?.map((w) => `${w.title}${w.user_rating ? ` (${w.user_rating}★)` : ""}`).join(", ") || "vazio";
 
-    // Get watchlist + watched for extra context
-    const [{ data: watchlist }, { data: watched }, { data: profile }] = await Promise.all([
-      serviceClient.from("watchlist").select("title, genres, year, rating").eq("user_id", user.id).limit(50),
-      serviceClient.from("watched").select("title, genres, year, user_rating").eq("user_id", user.id).limit(50),
-      serviceClient.from("profiles").select("*").eq("user_id", user.id).single(),
-    ]);
+    const prompt = `Você é um motor de recomendação de filmes para home page.
 
-    const watchlistTitles = watchlist?.map(w => w.title).join(", ") || "vazia";
-    const watchedTitles = watched?.map(w => `${w.title}${w.user_rating ? ` (${w.user_rating}★)` : ""}`).join(", ") || "vazio";
-
-    const prompt = `Você é um sistema de recomendação de filmes. Use o PERFIL DE GOSTO abaixo para gerar recomendações 100% PERSONALIZADAS.
-
-=== PERFIL DE GOSTO (Taste Note) ===
+PERFIL REAL DO USUÁRIO (TASTE NOTE):
 ${tasteNote}
 
-=== WATCHLIST ===
-${watchlistTitles}
+CONTEXTO:
+- Watchlist: ${watchlistTitles}
+- Já assistidos: ${watchedTitles}
+- Plataformas preferidas: ${profile?.platforms?.join(", ") || "Netflix, Prime Video, Disney+"}
 
-=== JÁ ASSISTIDOS ===
-${watchedTitles}
+TAREFA:
+- Gere EXATAMENTE 4 seções personalizadas para a home
+- Cada seção com 5-6 filmes REAIS
+- Títulos e subtítulos precisam refletir diretamente os gostos do taste note
+- NÃO repetir filmes entre seções
+- NÃO incluir filmes já assistidos
 
-=== PLATAFORMAS ===
-${profile?.platforms?.join(", ") || "Netflix, Prime Video, Disney+"}
+MATCH PERCENT:
+- Use o taste note para estimar compatibilidade real (não inventar números aleatórios)
+- Evite concentrar todos os filmes acima de 90%
+- Faixa recomendada por filme: 55-98
 
-TAREFA: Gere exatamente 4 seções para a home page. Os TÍTULOS das seções devem ser criativos e refletir o gosto específico do usuário (ex: se gosta de terror → "Noites Sem Dormir", se gosta de drama → "Emoções à Flor da Pele").
-
-Cada seção com 5-6 filmes REAIS.
-
-REGRAS:
-- APENAS filmes REAIS
-- NÃO repita filmes entre seções
-- NÃO inclua filmes já assistidos
-- Cada filme: title, year, rating (IMDB), genres (PT-BR), platforms (netflix/prime/disney), description (1 frase PT-BR), matchPercent (60-99)
-- Os títulos das seções DEVEM ser personalizados ao perfil, NUNCA genéricos
-
-Responda APENAS em JSON:
+FORMATO DE RESPOSTA (JSON válido):
 {
-  "taste_summary": "1-2 frases descrevendo o perfil de gosto em PT-BR",
+  "taste_summary": "1-2 frases em PT-BR resumindo o gosto",
   "sections": [
     {
-      "key": "section-1",
-      "title": "Título Criativo Personalizado",
-      "subtitle": "porque você curte X",
+      "key": "for-you",
+      "title": "...",
+      "subtitle": "...",
       "icon": "heart|flame|compass|star",
-      "movies": [{"id": "slug", "title": "...", "year": 2024, "rating": 8.1, "genres": ["Drama"], "platforms": ["netflix"], "description": "...", "matchPercent": 95}]
+      "movies": [
+        {
+          "id": "slug",
+          "title": "...",
+          "year": 2024,
+          "rating": 8.1,
+          "genres": ["Drama"],
+          "platforms": ["netflix"],
+          "description": "...",
+          "matchPercent": 84
+        }
+      ]
     }
   ]
 }`;
@@ -119,9 +190,13 @@ Responda APENAS em JSON:
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.8, maxOutputTokens: 4096, responseMimeType: "application/json" },
+          generationConfig: {
+            temperature: 0.6,
+            maxOutputTokens: 4096,
+            responseMimeType: "application/json",
+          },
         }),
-      }
+      },
     );
 
     if (!response.ok) {
@@ -135,42 +210,135 @@ Responda APENAS em JSON:
     if (!content) throw new Error("No AI response");
 
     const result = JSON.parse(content);
+    const normalizedSections = normalizeSections(result.sections || [], tasteNote, tasteSignals);
 
-    // Cache the result
-    await serviceClient.from("home_recommendations").upsert({
-      user_id: user.id,
-      sections: result.sections,
-      taste_summary: result.taste_summary,
-      generated_at: new Date().toISOString(),
-      signals_count: signalCount,
-    }, { onConflict: "user_id" });
+    const finalPayload = {
+      taste_summary: result.taste_summary || summarizeTasteNote(tasteNote),
+      sections: normalizedSections,
+    };
 
-    console.log(`Generated personalized home for user ${user.id} with ${signalCount} signals`);
+    await serviceClient.from("home_recommendations").upsert(
+      {
+        user_id: user.id,
+        sections: finalPayload.sections,
+        taste_summary: finalPayload.taste_summary,
+        generated_at: new Date().toISOString(),
+        signals_count: profileVersion,
+      },
+      { onConflict: "user_id" },
+    );
 
-    return new Response(JSON.stringify(result), {
+    return new Response(JSON.stringify(finalPayload), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
     console.error("personalize error:", e);
     return new Response(
       JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
 });
 
-/**
- * Build a structured "Taste Note" from raw taste signals.
- * Groups by category and summarizes into readable text.
- */
-function buildTasteNote(signals: any[]): string {
+async function fetchRecentUserMessages(serviceClient: ReturnType<typeof createClient>, userId: string): Promise<string[]> {
+  const { data: conversations } = await serviceClient
+    .from("conversations")
+    .select("id")
+    .eq("user_id", userId)
+    .order("updated_at", { ascending: false })
+    .limit(8);
+
+  const conversationIds = (conversations || []).map((c: { id: string }) => c.id);
+  if (conversationIds.length === 0) return [];
+
+  const { data: messages } = await serviceClient
+    .from("chat_messages")
+    .select("content, created_at")
+    .in("conversation_id", conversationIds)
+    .eq("role", "user")
+    .order("created_at", { ascending: false })
+    .limit(30);
+
+  return (messages || [])
+    .map((m: { content: string | null }) => (m.content || "").trim())
+    .filter((msg: string) => msg.length > 0);
+}
+
+async function extractTasteFromChat(userMessages: string[], apiKey: string): Promise<ChatTasteExtraction> {
+  const conversation = userMessages.slice(0, 20).join("\n");
+
+  const resp = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              {
+                text: `Analise as mensagens do usuário sobre cinema e extraia um perfil de gosto objetivo.
+
+MENSAGENS DO USUÁRIO:
+${conversation}
+
+Responda APENAS em JSON:
+{
+  "taste_note": "Texto curto com perfil de gosto em formato de nota",
+  "likes": ["..."],
+  "dislikes": ["..."],
+  "preferences": ["..."],
+  "signals": [
+    {"signal_type":"like|dislike|preference|interest|avoid","category":"genre|movie|mood|era|director|actor|theme|style|origin","value":"...","confidence":0.0}
+  ]
+}
+
+Regras:
+- Só usar sinais explícitos
+- Se faltar info, arrays vazios
+- Nunca inventar preferências não mencionadas`,
+              },
+            ],
+          },
+        ],
+        generationConfig: {
+          temperature: 0.2,
+          maxOutputTokens: 900,
+          responseMimeType: "application/json",
+        },
+      }),
+    },
+  );
+
+  if (!resp.ok) {
+    return { taste_note: "", likes: [], dislikes: [], preferences: [], signals: [] };
+  }
+
+  const data = await resp.json();
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) return { taste_note: "", likes: [], dislikes: [], preferences: [], signals: [] };
+
+  try {
+    const parsed = JSON.parse(text);
+    return {
+      taste_note: parsed.taste_note || "",
+      likes: Array.isArray(parsed.likes) ? parsed.likes : [],
+      dislikes: Array.isArray(parsed.dislikes) ? parsed.dislikes : [],
+      preferences: Array.isArray(parsed.preferences) ? parsed.preferences : [],
+      signals: Array.isArray(parsed.signals) ? parsed.signals : [],
+    };
+  } catch {
+    return { taste_note: "", likes: [], dislikes: [], preferences: [], signals: [] };
+  }
+}
+
+function buildTasteNoteFromSignals(signals: TasteSignal[]): string {
   const groups: Record<string, { likes: string[]; dislikes: string[]; preferences: string[] }> = {};
 
   for (const s of signals) {
-    const cat = s.category;
+    const cat = s.category || "general";
     if (!groups[cat]) groups[cat] = { likes: [], dislikes: [], preferences: [] };
 
-    const val = `${s.value} (confiança: ${s.confidence})`;
     if (s.signal_type === "like" || s.signal_type === "interest") {
       if (!groups[cat].likes.includes(s.value)) groups[cat].likes.push(s.value);
     } else if (s.signal_type === "dislike" || s.signal_type === "avoid") {
@@ -189,5 +357,118 @@ function buildTasteNote(signals: any[]): string {
     if (parts.length) lines.push(`[${category.toUpperCase()}] ${parts.join(" | ")}`);
   }
 
-  return lines.join("\n") || "Nenhum sinal de gosto capturado ainda.";
+  return lines.join("\n");
+}
+
+function dedupeSignals(signals: TasteSignal[]): TasteSignal[] {
+  const map = new Map<string, TasteSignal>();
+  for (const s of signals) {
+    if (!s?.value || !s?.category || !s?.signal_type) continue;
+    const key = `${s.signal_type}|${s.category}|${normalize(s.value)}`;
+    if (!map.has(key)) map.set(key, s);
+  }
+  return Array.from(map.values());
+}
+
+function normalizeSections(sections: any[], tasteNote: string, signals: TasteSignal[]) {
+  const liked = new Set<string>();
+  const disliked = new Set<string>();
+  const preferred = new Set<string>();
+
+  for (const s of signals) {
+    const v = normalize(s.value || "");
+    if (!v) continue;
+    if (s.signal_type === "like" || s.signal_type === "interest") liked.add(v);
+    if (s.signal_type === "dislike" || s.signal_type === "avoid") disliked.add(v);
+    if (s.signal_type === "preference") preferred.add(v);
+  }
+
+  // enrich from taste note keywords
+  const words = tokenize(tasteNote).filter((w) => w.length > 3);
+  for (const w of words.slice(0, 25)) preferred.add(w);
+
+  return sections.map((section: any, sectionIdx: number) => ({
+    key: section.key || `section-${sectionIdx + 1}`,
+    title: section.title || `Sugestões para você ${sectionIdx + 1}`,
+    subtitle: section.subtitle || undefined,
+    icon: ["heart", "flame", "compass", "star"].includes(section.icon) ? section.icon : "heart",
+    movies: (section.movies || []).map((movie: any, movieIdx: number) => {
+      const computed = computeMatchPercent(movie, liked, preferred, disliked);
+      return {
+        id: movie.id || `${sectionIdx}-${movieIdx}-${normalize(movie.title || "filme")}`,
+        title: movie.title,
+        year: movie.year,
+        rating: Number(movie.rating || 7.0),
+        genres: Array.isArray(movie.genres) ? movie.genres : [],
+        platforms: Array.isArray(movie.platforms) ? movie.platforms : ["netflix"],
+        description: movie.description || "",
+        matchPercent: computed,
+      };
+    }),
+  }));
+}
+
+function computeMatchPercent(
+  movie: any,
+  liked: Set<string>,
+  preferred: Set<string>,
+  disliked: Set<string>,
+): number {
+  const text = normalize(`${movie.title || ""} ${(movie.genres || []).join(" ")} ${movie.description || ""}`);
+
+  let score = 58;
+
+  for (const k of liked) {
+    if (k && text.includes(k)) score += 12;
+  }
+
+  for (const k of preferred) {
+    if (k && text.includes(k)) score += 8;
+  }
+
+  for (const k of disliked) {
+    if (k && text.includes(k)) score -= 16;
+  }
+
+  score += deterministicJitter(movie.title || "", 5) - 2;
+
+  if (score < 55) score = 55;
+  if (score > 98) score = 98;
+  return Math.round(score);
+}
+
+function summarizeTasteNote(tasteNote: string): string {
+  const lines = tasteNote.split("\n").filter(Boolean).slice(0, 2);
+  if (!lines.length) return "Seu perfil está em aprendizado.";
+  return lines.join(" ");
+}
+
+function tokenize(text: string): string[] {
+  const stopwords = new Set([
+    "para", "com", "sem", "uma", "uns", "umas", "dos", "das", "que", "por", "mais", "menos", "sobre", "filmes", "filme", "gosto", "quero", "tipo", "como", "ainda", "muito", "pouco", "this", "that", "from", "about", "home", "screen", "update",
+  ]);
+
+  return normalize(text)
+    .split(" ")
+    .map((w) => w.trim())
+    .filter((w) => w.length > 2 && !stopwords.has(w));
+}
+
+function normalize(value: string): string {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9\s-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function deterministicJitter(seed: string, modulo: number): number {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i += 1) {
+    hash = (hash << 5) - hash + seed.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash % Math.max(1, modulo));
 }

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import type { MoviePoster } from "@/lib/tmdb";
+import { MOVIE_POSTERS, type MoviePoster } from "@/lib/tmdb";
 
 interface PersonalizedSection {
   key: string;
@@ -21,8 +21,13 @@ const POSTER_BASE = "https://image.tmdb.org/t/p/w500";
 function buildPosterUrl(movie: any): string {
   if (movie.posterUrl) return movie.posterUrl;
   if (movie.poster_path) return `${POSTER_BASE}${movie.poster_path}`;
-  const slug = movie.title.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-");
-  return `/posters/${slug}.jpg`;
+  const slug = movie.title
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-");
+  if (MOVIE_POSTERS[slug]) return MOVIE_POSTERS[slug];
+  return "/placeholder.svg";
 }
 
 export function usePersonalizedHome() {
@@ -69,7 +74,7 @@ export function usePersonalizedHome() {
             posterUrl: buildPosterUrl(m),
             platforms: m.platforms || ["netflix"],
             genres: m.genres || [],
-            matchPercent: m.matchPercent,
+            matchPercent: typeof m.matchPercent === "number" ? m.matchPercent : undefined,
             description: m.description,
           })),
         }));

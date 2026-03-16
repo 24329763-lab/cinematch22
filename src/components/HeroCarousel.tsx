@@ -148,7 +148,7 @@ export default function HeroCarousel({ personalizedSections, hasPersonalization,
         const key = String(movie.id || movie.title);
         if (!dedup.has(key)) dedup.set(key, movieToHero(movie));
       }
-      const personal = Array.from(dedup.values());
+      const personal = Array.from(dedup.values()).filter((movie) => hasQualityPoster(movie.posterUrl));
       if (personal.length >= 2) return personal;
     }
 
@@ -163,6 +163,12 @@ export default function HeroCarousel({ personalizedSections, hasPersonalization,
     if (heroPool.length <= HERO_SET_SIZE) return heroPool;
     return seededShuffle(heroPool, sixHourBucket).slice(0, HERO_SET_SIZE);
   }, [heroPool, sixHourBucket]);
+
+  function hasQualityPoster(url?: string): boolean {
+    if (!url) return false;
+    if (url.includes("placeholder")) return false;
+    return url.includes("image.tmdb.org") || url.startsWith("/posters/");
+  }
 
   // Auto-rotate every 12 seconds
   useEffect(() => {
