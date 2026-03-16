@@ -20,10 +20,10 @@ type Message = {
 };
 
 const SUGGESTIONS = [
-  { text: "Um terror psicológico que não seja óbvio", icon: Film },
-  { text: "Algo leve pra assistir com a família", icon: Film },
-  { text: "Quero conversar sobre meu gosto em filmes", icon: MessageCircle },
-  { text: "Me ajuda a entender que tipo de filme eu curto", icon: MessageCircle },
+  { text: "Me recomenda algo tipo Whiplash", icon: Film },
+  { text: "Preciso de um filme pra hoje à noite", icon: Film },
+  { text: "Bora falar sobre meu gosto em filmes", icon: MessageCircle },
+  { text: "O que eu deveria assistir depois de Duna?", icon: Film },
 ];
 
 function movieRecToMoviePoster(movie: MovieRec, posterUrl: string): MoviePoster {
