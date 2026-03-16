@@ -32,6 +32,9 @@ const ProfilePage = () => {
   const [friends, setFriends] = useState<FriendProfile[]>([]);
   const [pendingInvites, setPendingInvites] = useState<Invite[]>([]);
   const [loading, setLoading] = useState(false);
+  const [changingCode, setChangingCode] = useState(false);
+  const [editingCode, setEditingCode] = useState(false);
+  const [customCode, setCustomCode] = useState("");
 
   useEffect(() => {
     if (!user) return;
