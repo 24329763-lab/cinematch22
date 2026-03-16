@@ -14,7 +14,191 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      chat_messages: {
+        Row: {
+          content: string
+          conversation_id: string
+          created_at: string | null
+          id: string
+          liked: boolean | null
+          movie_recommendations: Json | null
+          role: string
+        }
+        Insert: {
+          content: string
+          conversation_id: string
+          created_at?: string | null
+          id?: string
+          liked?: boolean | null
+          movie_recommendations?: Json | null
+          role: string
+        }
+        Update: {
+          content?: string
+          conversation_id?: string
+          created_at?: string | null
+          id?: string
+          liked?: boolean | null
+          movie_recommendations?: Json | null
+          role?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversations: {
+        Row: {
+          created_at: string | null
+          id: string
+          title: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          title?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          title?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string | null
+          display_name: string | null
+          favorite_genres: string[] | null
+          id: string
+          platforms: string[] | null
+          preferred_era: string | null
+          preferred_mood: string | null
+          preferred_origin: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string | null
+          display_name?: string | null
+          favorite_genres?: string[] | null
+          id?: string
+          platforms?: string[] | null
+          preferred_era?: string | null
+          preferred_mood?: string | null
+          preferred_origin?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string | null
+          display_name?: string | null
+          favorite_genres?: string[] | null
+          id?: string
+          platforms?: string[] | null
+          preferred_era?: string | null
+          preferred_mood?: string | null
+          preferred_origin?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      watched: {
+        Row: {
+          created_at: string | null
+          genres: string[] | null
+          id: string
+          movie_id: string
+          platforms: string[] | null
+          poster_url: string | null
+          title: string
+          user_id: string
+          user_rating: number | null
+          watched_at: string | null
+          year: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          genres?: string[] | null
+          id?: string
+          movie_id: string
+          platforms?: string[] | null
+          poster_url?: string | null
+          title: string
+          user_id: string
+          user_rating?: number | null
+          watched_at?: string | null
+          year?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          genres?: string[] | null
+          id?: string
+          movie_id?: string
+          platforms?: string[] | null
+          poster_url?: string | null
+          title?: string
+          user_id?: string
+          user_rating?: number | null
+          watched_at?: string | null
+          year?: number | null
+        }
+        Relationships: []
+      }
+      watchlist: {
+        Row: {
+          added_at: string | null
+          genres: string[] | null
+          id: string
+          movie_id: string
+          platforms: string[] | null
+          poster_url: string | null
+          rating: number | null
+          title: string
+          user_id: string
+          year: number | null
+        }
+        Insert: {
+          added_at?: string | null
+          genres?: string[] | null
+          id?: string
+          movie_id: string
+          platforms?: string[] | null
+          poster_url?: string | null
+          rating?: number | null
+          title: string
+          user_id: string
+          year?: number | null
+        }
+        Update: {
+          added_at?: string | null
+          genres?: string[] | null
+          id?: string
+          movie_id?: string
+          platforms?: string[] | null
+          poster_url?: string | null
+          rating?: number | null
+          title?: string
+          user_id?: string
+          year?: number | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
