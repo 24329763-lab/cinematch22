@@ -270,12 +270,64 @@ const ProfilePage = () => {
               <UserPlus size={16} className="text-primary" />
               <h3 className="text-sm font-bold">Seu Código de Amizade</h3>
             </div>
-            <div className="flex items-center gap-3">
-              <span className="text-2xl font-black tracking-[0.3em] gradient-text">{friendCode}</span>
-              <button onClick={copyFriendCode} className="p-2 rounded-xl glass text-muted-foreground hover:text-foreground transition-all">
-                <Copy size={16} />
-              </button>
-            </div>
+            
+            {editingCode ? (
+              <div className="space-y-3">
+                <input
+                  value={customCode}
+                  onChange={(e) => setCustomCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))}
+                  placeholder="Novo código (4-8 caracteres)"
+                  maxLength={8}
+                  className="w-full bg-transparent text-lg text-foreground placeholder:text-muted-foreground outline-none px-4 py-2.5 rounded-xl glass focus:ring-1 focus:ring-primary/50 tracking-[0.2em] font-bold"
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={saveCustomCode}
+                    disabled={customCode.length < 4 || changingCode}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl gradient-primary text-primary-foreground text-sm font-bold disabled:opacity-30"
+                  >
+                    {changingCode ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                    Salvar
+                  </button>
+                  <button
+                    onClick={() => { setEditingCode(false); setCustomCode(""); }}
+                    className="px-4 py-2.5 rounded-xl glass text-muted-foreground text-sm font-semibold hover:text-foreground"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl font-black tracking-[0.3em] gradient-text">{friendCode}</span>
+                  <div className="flex gap-1">
+                    <button onClick={copyFriendCode} className="p-2 rounded-xl glass text-muted-foreground hover:text-foreground transition-all" title="Copiar">
+                      <Copy size={16} />
+                    </button>
+                    <button onClick={shareFriendCode} className="p-2 rounded-xl glass text-muted-foreground hover:text-foreground transition-all" title="Compartilhar">
+                      <Share2 size={16} />
+                    </button>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 mt-3">
+                  <button
+                    onClick={() => setEditingCode(true)}
+                    className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-all"
+                  >
+                    <Pencil size={12} /> Personalizar código
+                  </button>
+                  <button
+                    onClick={regenerateCode}
+                    disabled={changingCode}
+                    className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-all"
+                  >
+                    {changingCode ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+                    Gerar novo
+                  </button>
+                </div>
+              </>
+            )}
             <p className="text-[11px] text-muted-foreground mt-2">Compartilhe com amigos para se conectarem</p>
           </div>
         )}
