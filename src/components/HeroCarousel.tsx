@@ -118,7 +118,6 @@ function movieToHero(movie: any): HeroMovie {
 interface HeroCarouselProps {
   personalizedSections?: any[];
   hasPersonalization: boolean;
-  trendingMovies?: MoviePoster[];
 }
 
 export default function HeroCarousel({ personalizedSections, hasPersonalization, trendingMovies = [] }: HeroCarouselProps) {
