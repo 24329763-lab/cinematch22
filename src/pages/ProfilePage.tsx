@@ -49,7 +49,7 @@ const ProfilePage = () => {
       .single();
     if (data) {
       setProfile(data);
-      setFriendCode(data.friend_code || "");
+      setFriendCode((data as any).friend_code || "");
     }
   };
 
