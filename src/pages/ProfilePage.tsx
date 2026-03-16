@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { motion } from "framer-motion";
-import { User, Film, Heart, Users, LogOut, Copy, UserPlus, Check, X, Loader2, Sparkles, RefreshCw, Share2, Pencil, MessageCircle } from "lucide-react";
+import { User, Film, Heart, Users, LogOut, Copy, UserPlus, Check, X, Loader2, Sparkles, RefreshCw, Share2, Pencil, MessageCircle, Camera } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 interface FriendProfile {
   user_id: string;
   display_name: string | null;
+  nickname: string | null;
   avatar_url: string | null;
   favorite_genres: string[] | null;
 }
@@ -26,6 +27,7 @@ const ProfilePage = () => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [profile, setProfile] = useState<any>(null);
   const [friendCode, setFriendCode] = useState<string>("");
   const [inviteCode, setInviteCode] = useState("");
@@ -39,6 +41,18 @@ const ProfilePage = () => {
   const [editingBio, setEditingBio] = useState(false);
   const [savingBio, setSavingBio] = useState(false);
   const [tasteSummary, setTasteSummary] = useState<string | null>(null);
+  // Nickname
+  const [nickname, setNickname] = useState("");
+  const [editingNickname, setEditingNickname] = useState(false);
+  const [nicknameInput, setNicknameInput] = useState("");
+  const [savingNickname, setSavingNickname] = useState(false);
+  // Display name
+  const [editingDisplayName, setEditingDisplayName] = useState(false);
+  const [displayNameInput, setDisplayNameInput] = useState("");
+  const [savingDisplayName, setSavingDisplayName] = useState(false);
+  // Avatar
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -59,6 +73,8 @@ const ProfilePage = () => {
       setProfile(data);
       setFriendCode((data as any).friend_code || "");
       setTasteBio((data as any).taste_bio || "");
+      setNickname((data as any).nickname || "");
+      setAvatarUrl((data as any).avatar_url || null);
     }
   };
 
@@ -90,7 +106,7 @@ const ProfilePage = () => {
 
     const { data: profiles } = await supabase
       .from("profiles")
-      .select("user_id, display_name, avatar_url, favorite_genres")
+      .select("user_id, display_name, nickname, avatar_url, favorite_genres")
       .in("user_id", friendIds);
 
     setFriends((profiles || []) as FriendProfile[]);
@@ -109,7 +125,7 @@ const ProfilePage = () => {
     const senderIds = data.map((i: any) => i.sender_id);
     const { data: profiles } = await supabase
       .from("profiles")
-      .select("user_id, display_name, avatar_url, favorite_genres")
+      .select("user_id, display_name, nickname, avatar_url, favorite_genres")
       .in("user_id", senderIds);
 
     const enriched = data.map((invite: any) => ({
@@ -121,14 +137,15 @@ const ProfilePage = () => {
   };
 
   const copyFriendCode = () => {
-    navigator.clipboard.writeText(friendCode);
+    navigator.clipboard.writeText(nickname || friendCode);
     toast({ title: "Código copiado!" });
   };
 
   const shareFriendCode = async () => {
+    const code = nickname || friendCode;
     const shareData = {
       title: "Me adicione no CineMatch!",
-      text: `Use meu código de amizade: ${friendCode}`,
+      text: `Use meu código de amizade: ${code}`,
     };
     if (navigator.share) {
       try { await navigator.share(shareData); } catch {}
@@ -153,19 +170,7 @@ const ProfilePage = () => {
         .eq("user_id", user.id);
       
       if (error) {
-        if (error.code === "23505") {
-          let retry = "";
-          for (let i = 0; i < 6; i++) retry += chars[Math.floor(Math.random() * chars.length)];
-          const { error: e2 } = await supabase.from("profiles").update({ friend_code: retry } as any).eq("user_id", user.id);
-          if (e2) {
-            toast({ variant: "destructive", title: "Tente novamente" });
-          } else {
-            setFriendCode(retry);
-            toast({ title: "Código atualizado!" });
-          }
-        } else {
-          toast({ variant: "destructive", title: "Erro ao trocar código" });
-        }
+        toast({ variant: "destructive", title: "Tente novamente" });
       } else {
         setFriendCode(newCode);
         toast({ title: "Código atualizado!" });
@@ -221,25 +226,110 @@ const ProfilePage = () => {
     }
   };
 
+  const saveNickname = async () => {
+    if (!user) return;
+    setSavingNickname(true);
+    try {
+      const cleaned = nicknameInput.trim().toLowerCase().replace(/[^a-z0-9_.-]/g, "");
+      if (cleaned.length < 3) {
+        toast({ variant: "destructive", title: "Mínimo 3 caracteres" });
+        return;
+      }
+      const { error } = await supabase
+        .from("profiles")
+        .update({ nickname: cleaned } as any)
+        .eq("user_id", user.id);
+      if (error) {
+        if (error.code === "23505") {
+          toast({ variant: "destructive", title: "Esse nickname já está em uso" });
+        } else {
+          toast({ variant: "destructive", title: "Erro ao salvar nickname" });
+        }
+      } else {
+        setNickname(cleaned);
+        setEditingNickname(false);
+        toast({ title: "Nickname salvo!" });
+      }
+    } finally {
+      setSavingNickname(false);
+    }
+  };
+
+  const saveDisplayName = async () => {
+    if (!user || !displayNameInput.trim()) return;
+    setSavingDisplayName(true);
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ display_name: displayNameInput.trim() } as any)
+        .eq("user_id", user.id);
+      if (error) {
+        toast({ variant: "destructive", title: "Erro ao salvar nome" });
+      } else {
+        setProfile((p: any) => ({ ...p, display_name: displayNameInput.trim() }));
+        setEditingDisplayName(false);
+        toast({ title: "Nome atualizado!" });
+      }
+    } finally {
+      setSavingDisplayName(false);
+    }
+  };
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    setUploadingAvatar(true);
+    try {
+      const ext = file.name.split(".").pop() || "jpg";
+      const path = `${user.id}/avatar.${ext}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from("avatars")
+        .upload(path, file, { upsert: true });
+      
+      if (uploadError) {
+        toast({ variant: "destructive", title: "Erro ao enviar foto" });
+        return;
+      }
+
+      const { data: urlData } = supabase.storage
+        .from("avatars")
+        .getPublicUrl(path);
+      
+      const publicUrl = urlData.publicUrl + `?t=${Date.now()}`;
+      
+      const { error: updateError } = await supabase
+        .from("profiles")
+        .update({ avatar_url: publicUrl } as any)
+        .eq("user_id", user.id);
+      
+      if (!updateError) {
+        setAvatarUrl(publicUrl);
+        toast({ title: "Foto atualizada!" });
+      }
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
   const sendInvite = async () => {
     if (!user || !inviteCode.trim()) return;
     setLoading(true);
     try {
-      const codeToSearch = inviteCode.toUpperCase().trim();
+      const codeToSearch = inviteCode.trim();
       
-      // Look up profile by friend_code
+      // Search by friend_code OR nickname
       const { data: targetProfiles, error: lookupError } = await (supabase
         .from("profiles")
-        .select("user_id, display_name") as any)
-        .eq("friend_code", codeToSearch);
+        .select("user_id, display_name, nickname") as any)
+        .or(`friend_code.eq.${codeToSearch.toUpperCase()},nickname.eq.${codeToSearch.toLowerCase()}`);
 
       if (lookupError) {
-        console.error("Lookup error:", lookupError);
         toast({ variant: "destructive", title: "Erro ao buscar código" });
         return;
       }
 
-      const targetProfile = (targetProfiles || [])[0] as { user_id: string; display_name: string | null } | undefined;
+      const targetProfile = (targetProfiles || [])[0] as { user_id: string; display_name: string | null; nickname: string | null } | undefined;
 
       if (!targetProfile) {
         toast({ variant: "destructive", title: "Código não encontrado", description: `Nenhum usuário com o código "${codeToSearch}"` });
@@ -251,7 +341,6 @@ const ProfilePage = () => {
         return;
       }
 
-      // Check if invite already exists
       const { data: existing } = await supabase
         .from("friend_invites")
         .select("id, status")
@@ -264,12 +353,9 @@ const ProfilePage = () => {
         } else if (inv.status === "pending") {
           toast({ title: "Convite já enviado!" });
         } else {
-          // Rejected — allow re-sending
           await supabase.from("friend_invites").delete().eq("id", inv.id);
         }
-        if (inv.status !== "rejected") {
-          return;
-        }
+        if (inv.status !== "rejected") return;
       }
 
       const { error } = await supabase.from("friend_invites").insert({
@@ -282,7 +368,7 @@ const ProfilePage = () => {
         return;
       }
 
-      toast({ title: `Convite enviado para ${targetProfile.display_name || "usuário"}!` });
+      toast({ title: `Convite enviado para ${targetProfile.nickname || targetProfile.display_name || "usuário"}!` });
       setInviteCode("");
     } finally {
       setLoading(false);
@@ -323,15 +409,78 @@ const ProfilePage = () => {
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-md mx-auto">
         {/* Profile header */}
         <div className="flex flex-col items-center mb-8">
-          <div className="w-24 h-24 rounded-full gradient-primary flex items-center justify-center mb-4 cinema-glow">
-            {user.user_metadata?.avatar_url ? (
-              <img src={user.user_metadata.avatar_url} alt="" className="w-full h-full rounded-full object-cover" />
-            ) : (
-              <User size={36} className="text-primary-foreground" />
-            )}
+          <div className="relative group cursor-pointer mb-4" onClick={() => fileInputRef.current?.click()}>
+            <div className="w-24 h-24 rounded-full gradient-primary flex items-center justify-center overflow-hidden cinema-glow">
+              {avatarUrl ? (
+                <img src={avatarUrl} alt="" className="w-full h-full rounded-full object-cover" />
+              ) : (
+                <User size={36} className="text-primary-foreground" />
+              )}
+            </div>
+            <div className="absolute inset-0 rounded-full bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+              {uploadingAvatar ? <Loader2 size={20} className="animate-spin text-foreground" /> : <Camera size={20} className="text-foreground" />}
+            </div>
+            <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
           </div>
-          <h1 className="text-2xl font-black tracking-display">{profile?.display_name || user.email}</h1>
-          <p className="text-sm text-muted-foreground mt-1">{user.email}</p>
+
+          {/* Display name */}
+          {editingDisplayName ? (
+            <div className="flex items-center gap-2 mb-1">
+              <input
+                value={displayNameInput}
+                onChange={(e) => setDisplayNameInput(e.target.value)}
+                placeholder="Seu nome"
+                className="bg-transparent text-xl font-black text-center text-foreground outline-none border-b border-primary/40 pb-1 w-48"
+                autoFocus
+              />
+              <button onClick={saveDisplayName} disabled={savingDisplayName} className="p-1 text-primary">
+                {savingDisplayName ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+              </button>
+              <button onClick={() => setEditingDisplayName(false)} className="p-1 text-muted-foreground"><X size={14} /></button>
+            </div>
+          ) : (
+            <button
+              onClick={() => { setDisplayNameInput(profile?.display_name || ""); setEditingDisplayName(true); }}
+              className="flex items-center gap-1.5 group"
+            >
+              <h1 className="text-2xl font-black tracking-display">{profile?.display_name || "Seu Nome"}</h1>
+              <Pencil size={12} className="text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+            </button>
+          )}
+
+          {/* Nickname */}
+          {editingNickname ? (
+            <div className="flex items-center gap-2 mt-1">
+              <span className="text-sm text-muted-foreground">@</span>
+              <input
+                value={nicknameInput}
+                onChange={(e) => setNicknameInput(e.target.value.toLowerCase().replace(/[^a-z0-9_.-]/g, ""))}
+                placeholder="seunickname"
+                maxLength={20}
+                className="bg-transparent text-sm text-foreground outline-none border-b border-primary/40 pb-0.5 w-36"
+                autoFocus
+              />
+              <button onClick={saveNickname} disabled={savingNickname} className="p-1 text-primary">
+                {savingNickname ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+              </button>
+              <button onClick={() => setEditingNickname(false)} className="p-1 text-muted-foreground"><X size={12} /></button>
+            </div>
+          ) : (
+            <button
+              onClick={() => { setNicknameInput(nickname); setEditingNickname(true); }}
+              className="flex items-center gap-1 mt-1 group"
+            >
+              <span className="text-sm text-muted-foreground">
+                {nickname ? `@${nickname}` : "Toque para criar um @nickname"}
+              </span>
+              <Pencil size={10} className="text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+            </button>
+          )}
+
+          <p className="text-xs text-muted-foreground mt-1">{user.email}</p>
+          {nickname && (
+            <p className="text-[10px] text-muted-foreground/60 mt-0.5">Amigos podem te encontrar por @{nickname}</p>
+          )}
         </div>
 
         {/* Taste Profile Card */}
@@ -451,7 +600,7 @@ const ProfilePage = () => {
             ) : (
               <>
                 <div className="flex items-center gap-3">
-                  <span className="text-2xl font-black tracking-[0.3em] gradient-text">{friendCode}</span>
+                  <span className="text-2xl font-black tracking-[0.3em] gradient-text">{nickname || friendCode}</span>
                   <div className="flex gap-1">
                     <button onClick={copyFriendCode} className="p-2 rounded-xl glass text-muted-foreground hover:text-foreground transition-all" title="Copiar">
                       <Copy size={16} />
@@ -463,7 +612,7 @@ const ProfilePage = () => {
                 </div>
                 <div className="flex items-center gap-3 mt-3">
                   <button onClick={() => setEditingCode(true)} className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-all">
-                    <Pencil size={12} /> Personalizar
+                    <Pencil size={12} /> Personalizar código
                   </button>
                   <button onClick={regenerateCode} disabled={changingCode} className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-all">
                     {changingCode ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
@@ -472,7 +621,9 @@ const ProfilePage = () => {
                 </div>
               </>
             )}
-            <p className="text-[11px] text-muted-foreground mt-2">Compartilhe com amigos para se conectarem</p>
+            <p className="text-[11px] text-muted-foreground mt-2">
+              {nickname ? `Amigos podem usar @${nickname} ou o código acima` : "Compartilhe com amigos para se conectarem"}
+            </p>
           </div>
         )}
 
@@ -485,14 +636,14 @@ const ProfilePage = () => {
           <div className="flex gap-2">
             <input
               value={inviteCode}
-              onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
-              placeholder="Código do amigo"
-              maxLength={8}
-              className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none px-4 py-2.5 rounded-xl glass focus:ring-1 focus:ring-primary/50 tracking-[0.2em] font-bold"
+              onChange={(e) => setInviteCode(e.target.value)}
+              placeholder="Código ou @nickname"
+              maxLength={20}
+              className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none px-4 py-2.5 rounded-xl glass focus:ring-1 focus:ring-primary/50 font-bold"
             />
             <button
               onClick={sendInvite}
-              disabled={inviteCode.length < 4 || loading}
+              disabled={inviteCode.length < 3 || loading}
               className="px-4 py-2.5 rounded-xl gradient-primary text-primary-foreground text-sm font-bold disabled:opacity-30 transition-all"
             >
               {loading ? <Loader2 size={16} className="animate-spin" /> : "Enviar"}
@@ -510,11 +661,15 @@ const ProfilePage = () => {
             <div className="space-y-2.5">
               {pendingInvites.map((invite) => (
                 <div key={invite.id} className="flex items-center gap-3 p-3.5 rounded-xl glass">
-                  <div className="w-10 h-10 rounded-full gradient-primary flex items-center justify-center text-sm font-bold text-primary-foreground">
-                    {(invite.sender_profile?.display_name || "?")[0].toUpperCase()}
+                  <div className="w-10 h-10 rounded-full gradient-primary flex items-center justify-center text-sm font-bold text-primary-foreground overflow-hidden">
+                    {invite.sender_profile?.avatar_url ? (
+                      <img src={invite.sender_profile.avatar_url} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      (invite.sender_profile?.display_name || "?")[0].toUpperCase()
+                    )}
                   </div>
                   <div className="flex-1">
-                    <p className="text-sm font-semibold">{invite.sender_profile?.display_name || "Alguém"}</p>
+                    <p className="text-sm font-semibold">{invite.sender_profile?.nickname ? `@${invite.sender_profile.nickname}` : invite.sender_profile?.display_name || "Alguém"}</p>
                     <p className="text-[11px] text-muted-foreground">quer se conectar</p>
                   </div>
                   <div className="flex gap-1.5">
@@ -553,11 +708,15 @@ const ProfilePage = () => {
             <div className="space-y-2.5">
               {friends.map((friend) => (
                 <div key={friend.user_id} className="flex items-center gap-3 p-3.5 rounded-xl glass">
-                  <div className="w-10 h-10 rounded-full gradient-primary flex items-center justify-center text-sm font-bold text-primary-foreground">
-                    {(friend.display_name || "?")[0].toUpperCase()}
+                  <div className="w-10 h-10 rounded-full gradient-primary flex items-center justify-center text-sm font-bold text-primary-foreground overflow-hidden">
+                    {friend.avatar_url ? (
+                      <img src={friend.avatar_url} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      (friend.display_name || "?")[0].toUpperCase()
+                    )}
                   </div>
                   <div className="flex-1">
-                    <p className="text-sm font-semibold">{friend.display_name || "Usuário"}</p>
+                    <p className="text-sm font-semibold">{friend.nickname ? `@${friend.nickname}` : friend.display_name || "Usuário"}</p>
                     {friend.favorite_genres && friend.favorite_genres.length > 0 && (
                       <p className="text-[11px] text-muted-foreground">
                         Curte: {friend.favorite_genres.slice(0, 3).join(", ")}

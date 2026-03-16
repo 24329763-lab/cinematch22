@@ -138,6 +138,7 @@ export type Database = {
           favorite_genres: string[] | null
           friend_code: string
           id: string
+          nickname: string | null
           platforms: string[] | null
           preferred_era: string | null
           preferred_mood: string | null
@@ -153,6 +154,7 @@ export type Database = {
           favorite_genres?: string[] | null
           friend_code?: string
           id?: string
+          nickname?: string | null
           platforms?: string[] | null
           preferred_era?: string | null
           preferred_mood?: string | null
@@ -168,6 +170,7 @@ export type Database = {
           favorite_genres?: string[] | null
           friend_code?: string
           id?: string
+          nickname?: string | null
           platforms?: string[] | null
           preferred_era?: string | null
           preferred_mood?: string | null

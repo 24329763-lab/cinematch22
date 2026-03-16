@@ -1,29 +1,42 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, Sparkles, Film, Heart, Users } from "lucide-react";
+import { ArrowLeft, Sparkles, Heart, Users, Zap, Music, Film, Globe } from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 
-interface FriendProfile {
-  display_name: string | null;
-  favorite_genres: string[] | null;
+interface TasteSignal {
+  signal_type: string;
+  category: string;
+  value: string;
+  confidence: number;
 }
 
-interface CommonMovie {
-  title: string;
-  poster_url: string | null;
-  genres: string[] | null;
+interface FriendProfile {
+  display_name: string | null;
+  nickname: string | null;
+  avatar_url: string | null;
+  favorite_genres: string[] | null;
+  taste_bio: string | null;
 }
+
+const CATEGORY_ICONS: Record<string, React.ElementType> = {
+  genre: Film,
+  mood: Heart,
+  director: Sparkles,
+  theme: Globe,
+  era: Music,
+};
 
 const PartyPage = () => {
   const { friendId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
   const [friendProfile, setFriendProfile] = useState<FriendProfile | null>(null);
-  const [commonWatchlist, setCommonWatchlist] = useState<CommonMovie[]>([]);
-  const [myGenres, setMyGenres] = useState<string[]>([]);
-  const [friendGenres, setFriendGenres] = useState<string[]>([]);
+  const [commonTastes, setCommonTastes] = useState<{ category: string; values: string[] }[]>([]);
+  const [myUnique, setMyUnique] = useState<string[]>([]);
+  const [friendUnique, setFriendUnique] = useState<string[]>([]);
+  const [compatibility, setCompatibility] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -36,34 +49,53 @@ const PartyPage = () => {
     setLoading(true);
 
     try {
-      // Load friend profile & both watchlists in parallel
-      const [friendProfileRes, myWatchlistRes, friendWatchlistRes, myProfileRes] = await Promise.all([
-        supabase.from("profiles").select("display_name, favorite_genres").eq("user_id", friendId).single(),
-        supabase.from("watchlist").select("title, poster_url, genres").eq("user_id", user.id),
-        supabase.from("watchlist").select("title, poster_url, genres").eq("user_id", friendId),
-        supabase.from("profiles").select("favorite_genres").eq("user_id", user.id).single(),
+      const [friendProfileRes, mySignalsRes, friendSignalsRes] = await Promise.all([
+        supabase.from("profiles").select("display_name, nickname, avatar_url, favorite_genres, taste_bio").eq("user_id", friendId).single(),
+        supabase.from("taste_signals").select("signal_type, category, value, confidence").eq("user_id", user.id),
+        supabase.from("taste_signals").select("signal_type, category, value, confidence").eq("user_id", friendId),
       ]);
 
       if (friendProfileRes.data) {
-        setFriendProfile(friendProfileRes.data as FriendProfile);
-        setFriendGenres(friendProfileRes.data.favorite_genres || []);
-      }
-      if (myProfileRes.data) {
-        setMyGenres(myProfileRes.data.favorite_genres || []);
+        setFriendProfile(friendProfileRes.data as any);
       }
 
-      // Find common movies
-      const myTitles = new Set((myWatchlistRes.data || []).map((m: any) => m.title.toLowerCase()));
-      const common = (friendWatchlistRes.data || []).filter((m: any) => myTitles.has(m.title.toLowerCase()));
-      setCommonWatchlist(common as CommonMovie[]);
+      const mySignals = (mySignalsRes.data || []) as TasteSignal[];
+      const friendSignals = (friendSignalsRes.data || []) as TasteSignal[];
 
-      // Also find genre overlaps for suggestions
+      // Find common taste values
+      const myValues = new Set(mySignals.map((s) => `${s.category}::${s.value.toLowerCase()}`));
+      const friendValues = new Set(friendSignals.map((s) => `${s.category}::${s.value.toLowerCase()}`));
+
+      const commonSet = new Set([...myValues].filter((v) => friendValues.has(v)));
+
+      // Group common tastes by category
+      const grouped: Record<string, string[]> = {};
+      commonSet.forEach((key) => {
+        const [cat, val] = key.split("::");
+        if (!grouped[cat]) grouped[cat] = [];
+        grouped[cat].push(val);
+      });
+
+      setCommonTastes(
+        Object.entries(grouped).map(([category, values]) => ({ category, values }))
+      );
+
+      // Unique interests
+      const myUniqueVals = [...myValues].filter((v) => !friendValues.has(v)).map((v) => v.split("::")[1]).slice(0, 6);
+      const friendUniqueVals = [...friendValues].filter((v) => !myValues.has(v)).map((v) => v.split("::")[1]).slice(0, 6);
+      setMyUnique(myUniqueVals);
+      setFriendUnique(friendUniqueVals);
+
+      // Compatibility score
+      const total = new Set([...myValues, ...friendValues]).size;
+      const score = total > 0 ? Math.round((commonSet.size / total) * 100) : 0;
+      setCompatibility(score);
     } finally {
       setLoading(false);
     }
   };
 
-  const commonGenres = myGenres.filter((g) => friendGenres.includes(g));
+  const friendName = friendProfile?.nickname || friendProfile?.display_name || "Amigo";
 
   if (!user) {
     return (
@@ -83,84 +115,107 @@ const PartyPage = () => {
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
           <div className="text-center mb-8">
             <div className="w-16 h-16 rounded-2xl gradient-primary flex items-center justify-center mb-4 mx-auto cinema-glow">
-              <Users size={28} className="text-primary-foreground" />
+              <Zap size={28} className="text-primary-foreground" />
             </div>
             <h1 className="text-2xl font-black tracking-display">
               🎉 Party Mode
             </h1>
             <p className="text-sm text-muted-foreground mt-2">
-              {friendProfile ? `Você + ${friendProfile.display_name || "Amigo"}` : "Carregando..."}
+              Você + {friendName}
             </p>
           </div>
 
           {loading ? (
-            <div className="text-center text-muted-foreground text-sm py-12">Encontrando filmes em comum...</div>
+            <div className="text-center text-muted-foreground text-sm py-12">Analisando perfis de gosto...</div>
           ) : (
             <>
-              {/* Common genres */}
-              {commonGenres.length > 0 && (
-                <div className="glass-surface rounded-2xl p-5 mb-6">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Sparkles size={16} className="text-cinema-gold" />
-                    <h3 className="text-sm font-bold">Gêneros em Comum</h3>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {commonGenres.map((g) => (
-                      <span key={g} className="text-[11px] font-semibold px-3 py-1.5 rounded-full gradient-primary text-primary-foreground">
-                        {g}
-                      </span>
-                    ))}
-                  </div>
+              {/* Compatibility score */}
+              <div className="glass-surface rounded-2xl p-6 mb-6 text-center">
+                <div className="text-5xl font-black gradient-text mb-2">{compatibility}%</div>
+                <p className="text-sm text-muted-foreground">Compatibilidade de Gosto</p>
+                <div className="w-full h-2 rounded-full bg-muted/30 mt-4 overflow-hidden">
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${compatibility}%` }}
+                    transition={{ duration: 1.2, ease: "easeOut" }}
+                    className="h-full rounded-full gradient-primary"
+                  />
                 </div>
-              )}
-
-              {/* Friend's taste */}
-              {friendGenres.length > 0 && (
-                <div className="glass-surface rounded-2xl p-5 mb-6">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Heart size={16} className="text-primary" />
-                    <h3 className="text-sm font-bold">Gosto de {friendProfile?.display_name || "Amigo"}</h3>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {friendGenres.map((g) => (
-                      <span key={g} className="text-[11px] font-semibold px-3 py-1.5 rounded-full glass text-foreground/80">
-                        {g}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Common watchlist */}
-              <div className="glass-surface rounded-2xl p-5 mb-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <Film size={16} className="text-accent" />
-                  <h3 className="text-sm font-bold">
-                    Filmes na Lista de Ambos ({commonWatchlist.length})
-                  </h3>
-                </div>
-                {commonWatchlist.length > 0 ? (
-                  <div className="space-y-2.5">
-                    {commonWatchlist.map((movie) => (
-                      <div key={movie.title} className="flex items-center gap-3 p-3 rounded-xl glass">
-                        {movie.poster_url && (
-                          <img src={movie.poster_url} alt={movie.title} className="w-12 h-16 rounded-lg object-cover" />
-                        )}
-                        <div className="flex-1">
-                          <p className="text-sm font-semibold">{movie.title}</p>
-                          {movie.genres && (
-                            <p className="text-[11px] text-muted-foreground">{movie.genres.slice(0, 3).join(", ")}</p>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    Nenhum filme em comum na lista ainda. Adicionem filmes às suas listas!
-                  </p>
-                )}
               </div>
+
+              {/* Common tastes */}
+              {commonTastes.length > 0 && (
+                <div className="glass-surface rounded-2xl p-5 mb-6">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Sparkles size={16} className="text-cinema-gold" />
+                    <h3 className="text-sm font-bold">Gostos em Comum</h3>
+                  </div>
+                  <div className="space-y-3">
+                    {commonTastes.map(({ category, values }) => {
+                      const Icon = CATEGORY_ICONS[category] || Heart;
+                      return (
+                        <div key={category}>
+                          <div className="flex items-center gap-1.5 mb-1.5">
+                            <Icon size={12} className="text-muted-foreground" />
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{category}</span>
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {values.map((v) => (
+                              <span key={v} className="text-[11px] font-semibold px-3 py-1.5 rounded-full gradient-primary text-primary-foreground capitalize">
+                                {v}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Unique tastes */}
+              <div className="grid grid-cols-2 gap-3 mb-6">
+                <div className="glass-surface rounded-2xl p-4">
+                  <p className="text-[10px] font-bold uppercase text-muted-foreground mb-2">Só você curte</p>
+                  <div className="flex flex-wrap gap-1">
+                    {myUnique.length > 0 ? myUnique.map((v) => (
+                      <span key={v} className="text-[10px] px-2 py-1 rounded-full glass text-foreground/70 capitalize">{v}</span>
+                    )) : (
+                      <span className="text-[10px] text-muted-foreground">Vocês são bem parecidos!</span>
+                    )}
+                  </div>
+                </div>
+                <div className="glass-surface rounded-2xl p-4">
+                  <p className="text-[10px] font-bold uppercase text-muted-foreground mb-2">Só {friendName} curte</p>
+                  <div className="flex flex-wrap gap-1">
+                    {friendUnique.length > 0 ? friendUnique.map((v) => (
+                      <span key={v} className="text-[10px] px-2 py-1 rounded-full glass text-foreground/70 capitalize">{v}</span>
+                    )) : (
+                      <span className="text-[10px] text-muted-foreground">Vocês são bem parecidos!</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Friend's bio */}
+              {friendProfile?.taste_bio && (
+                <div className="glass rounded-2xl p-4 mb-6 flex items-start gap-3">
+                  <div className="w-7 h-7 rounded-lg gradient-primary flex items-center justify-center flex-shrink-0">
+                    <Heart size={12} className="text-primary-foreground" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold gradient-text uppercase tracking-wider">O que {friendName} diz</span>
+                    <p className="text-xs text-foreground/70 mt-0.5 leading-relaxed">{friendProfile.taste_bio}</p>
+                  </div>
+                </div>
+              )}
+
+              {commonTastes.length === 0 && (
+                <div className="text-center text-muted-foreground text-sm py-8">
+                  <p>Ainda não há dados de gosto suficientes.</p>
+                  <p className="text-xs mt-1">Conversem no chat para construir seus perfis!</p>
+                </div>
+              )}
             </>
           )}
         </motion.div>
