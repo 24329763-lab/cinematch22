@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Sparkles, Heart, Star, Compass, Flame, TrendingUp, Clock, Globe, Loader2, MessageCircle } from "lucide-react";
 import PosterCard from "@/components/PosterCard";
@@ -8,6 +8,7 @@ import HeroCarousel from "@/components/HeroCarousel";
 import { useAuth } from "@/hooks/useAuth";
 import { usePersonalizedHome } from "@/hooks/usePersonalizedHome";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 import type { MoviePoster } from "@/lib/tmdb";
 
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -66,6 +67,34 @@ const HomePage = () => {
   const { user } = useAuth();
   const { personalizedSections, tasteSummary, isLoading: personalizationLoading, hasPersonalization } = usePersonalizedHome();
   const [selectedMovie, setSelectedMovie] = useState<MoviePoster | null>(null);
+  const [watchlistItems, setWatchlistItems] = useState<MoviePoster[]>([]);
+
+  // Fetch watchlist for "Minha Lista" row
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from("watchlist")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("added_at", { ascending: false })
+      .limit(20)
+      .then(({ data }) => {
+        if (data && data.length > 0) {
+          setWatchlistItems(
+            data.map((item: any) => ({
+              id: item.movie_id,
+              title: item.title,
+              year: item.year || 2024,
+              rating: item.rating || 7.5,
+              posterUrl: item.poster_url || "/placeholder.svg",
+              platforms: (item.platforms || []) as ("netflix" | "prime" | "disney")[],
+              genres: item.genres || [],
+              description: "",
+            }))
+          );
+        }
+      });
+  }, [user]);
 
   return (
     <div className="min-h-[calc(100dvh-4rem)] overflow-y-auto pb-24 relative">
@@ -100,11 +129,23 @@ const HomePage = () => {
         </motion.div>
       )}
 
-      {/* Personalized sections only */}
+      {/* My List row */}
+      {watchlistItems.length > 0 && (
+        <section className="mt-8">
+          <SectionHeader icon={Heart} title="Minha Lista" subtitle="Filmes que você salvou" />
+          <HorizontalScroll>
+            {watchlistItems.map((movie, i) => (
+              <PosterCard key={movie.id} movie={movie} index={i} onSelect={setSelectedMovie} />
+            ))}
+          </HorizontalScroll>
+        </section>
+      )}
+
+      {/* Personalized sections */}
       {hasPersonalization && personalizedSections.map((section, sIdx) => {
         const IconComp = ICON_MAP[section.icon] || Heart;
         return (
-          <section key={section.key} className={sIdx === 0 ? "mt-8" : "mt-10"}>
+          <section key={section.key} className={sIdx === 0 && watchlistItems.length === 0 ? "mt-8" : "mt-10"}>
             <SectionHeader icon={IconComp} title={section.title} subtitle={section.subtitle} />
             <HorizontalScroll>
               {section.movies.map((movie, i) => (
@@ -116,7 +157,7 @@ const HomePage = () => {
       })}
 
       {/* Chat CTA when not enough personalized content */}
-      {user && !personalizationLoading && (!hasPersonalization || personalizedSections.length < 2) && (
+      {user && !personalizationLoading && (!hasPersonalization || personalizedSections.length < 3) && (
         <ChatCTA />
       )}
 

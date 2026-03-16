@@ -1,12 +1,11 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { motion, AnimatePresence, useMotionValue, useTransform, useSpring } from "framer-motion";
 import { Sparkles, Star, Play, Plus, Check } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useTasteCapture } from "@/hooks/useTasteCapture";
 import type { MoviePoster } from "@/lib/tmdb";
-import { MOVIE_BACKDROPS } from "@/lib/tmdb";
 
 interface HeroMovie {
   id: string;
@@ -81,14 +80,12 @@ function hashSeed(seed: number): number {
 function seededShuffle<T>(arr: T[], seed: number): T[] {
   const out = [...arr];
   let state = hashSeed(seed) || 1;
-
   const rand = () => {
     state ^= state << 13;
     state ^= state >>> 17;
     state ^= state << 5;
     return (state >>> 0) / 0xffffffff;
   };
-
   for (let i = out.length - 1; i > 0; i -= 1) {
     const j = Math.floor(rand() * (i + 1));
     [out[i], out[j]] = [out[j], out[i]];
@@ -127,8 +124,29 @@ export default function HeroCarousel({ personalizedSections, hasPersonalization 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
   const [sixHourBucket, setSixHourBucket] = useState(getSixHourBucket());
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  // keep bucket synced so hero set changes every 6h even without reload
+  // Parallax mouse tracking
+  const mouseX = useMotionValue(0.5);
+  const mouseY = useMotionValue(0.5);
+  const springConfig = { stiffness: 150, damping: 20 };
+  const rotateX = useSpring(useTransform(mouseY, [0, 1], [3, -3]), springConfig);
+  const rotateY = useSpring(useTransform(mouseX, [0, 1], [-3, 3]), springConfig);
+  const imgX = useSpring(useTransform(mouseX, [0, 1], [8, -8]), springConfig);
+  const imgY = useSpring(useTransform(mouseY, [0, 1], [8, -8]), springConfig);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    mouseX.set((e.clientX - rect.left) / rect.width);
+    mouseY.set((e.clientY - rect.top) / rect.height);
+  }, [mouseX, mouseY]);
+
+  const handleMouseLeave = useCallback(() => {
+    mouseX.set(0.5);
+    mouseY.set(0.5);
+  }, [mouseX, mouseY]);
+
   useEffect(() => {
     const timer = setInterval(() => {
       setSixHourBucket((prev) => {
@@ -150,7 +168,6 @@ export default function HeroCarousel({ personalizedSections, hasPersonalization 
       const personal = Array.from(dedup.values()).filter((movie) => hasQualityPoster(movie.posterUrl));
       if (personal.length >= 2) return personal;
     }
-
     return DEFAULT_HEROES;
   }, [hasPersonalization, personalizedSections]);
 
@@ -165,7 +182,6 @@ export default function HeroCarousel({ personalizedSections, hasPersonalization 
     return url.includes("image.tmdb.org") || url.startsWith("/posters/");
   }
 
-  // Auto-rotate every 12 seconds
   useEffect(() => {
     if (heroes.length <= 1) return;
     const interval = setInterval(() => {
@@ -174,7 +190,6 @@ export default function HeroCarousel({ personalizedSections, hasPersonalization 
     return () => clearInterval(interval);
   }, [heroes.length]);
 
-  // Reset index when hero set changes
   useEffect(() => {
     setCurrentIndex(0);
   }, [heroes]);
@@ -186,7 +201,6 @@ export default function HeroCarousel({ personalizedSections, hasPersonalization 
       toast({ variant: "destructive", title: "Faça login para salvar" });
       return;
     }
-
     const slug = hero.id || hero.title.toLowerCase().replace(/[^a-z0-9]+/g, "-");
     const { error } = await supabase.from("watchlist").upsert({
       user_id: user.id,
@@ -198,7 +212,6 @@ export default function HeroCarousel({ personalizedSections, hasPersonalization 
       platforms: hero.platforms || ["netflix"],
       genres: hero.genres,
     }, { onConflict: "user_id,movie_id" });
-
     if (!error) {
       setAddedIds((prev) => new Set(prev).add(hero.id));
       toast({ title: "Adicionado à sua lista!" });
@@ -210,7 +223,19 @@ export default function HeroCarousel({ personalizedSections, hasPersonalization 
 
   return (
     <div className="px-3 pt-3">
-      <div className="relative rounded-3xl overflow-hidden glass-surface-strong" style={{ boxShadow: "0 20px 60px rgba(0,0,0,0.6)" }}>
+      <motion.div
+        ref={containerRef}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
+        className="relative rounded-3xl overflow-hidden glass-surface-strong"
+        style={{
+          boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
+          perspective: 1200,
+          rotateX,
+          rotateY,
+          transformStyle: "preserve-3d",
+        }}
+      >
         <div className="relative h-[70vh] min-h-[420px] max-h-[750px]">
           <AnimatePresence mode="wait">
             <motion.img
@@ -218,10 +243,11 @@ export default function HeroCarousel({ personalizedSections, hasPersonalization 
               src={hero.backdropUrl}
               alt={hero.title}
               className="absolute inset-0 w-full h-full object-cover"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
+              initial={{ opacity: 0, scale: 1.05 }}
+              animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.8 }}
+              style={{ x: imgX, y: imgY }}
             />
           </AnimatePresence>
 
@@ -234,7 +260,7 @@ export default function HeroCarousel({ personalizedSections, hasPersonalization 
                 <Sparkles size={12} className="text-primary-foreground" />
               </div>
               <span className="text-[11px] font-bold gradient-text uppercase tracking-[0.15em]">
-                {hasPersonalization ? "Escolhido pra Você" : "Em Alta no Brasil"}
+                {hasPersonalization ? "Escolhido pra Você" : "Em Destaque"}
               </span>
             </div>
 
@@ -286,7 +312,7 @@ export default function HeroCarousel({ personalizedSections, hasPersonalization 
             </div>
           </div>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 }
