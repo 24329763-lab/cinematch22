@@ -164,6 +164,12 @@ export default function HeroCarousel({ personalizedSections, hasPersonalization,
     return seededShuffle(heroPool, sixHourBucket).slice(0, HERO_SET_SIZE);
   }, [heroPool, sixHourBucket]);
 
+  function hasQualityPoster(url?: string): boolean {
+    if (!url) return false;
+    if (url.includes("placeholder")) return false;
+    return url.includes("image.tmdb.org") || url.startsWith("/posters/");
+  }
+
   // Auto-rotate every 12 seconds
   useEffect(() => {
     if (heroes.length <= 1) return;

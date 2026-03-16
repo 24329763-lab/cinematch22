@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import type { MoviePoster } from "@/lib/tmdb";
+import { MOVIE_POSTERS, type MoviePoster } from "@/lib/tmdb";
 
 interface PersonalizedSection {
   key: string;
