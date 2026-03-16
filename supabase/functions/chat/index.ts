@@ -18,7 +18,7 @@ function toGeminiMessages(messages: { role: string; content: string }[]) {
 
 async function extractTasteSignals(messages: { role: string; content: string }[], userId: string, apiKey: string) {
   try {
-    if (messages.length < 2) return;
+    if (messages.length < 1) return;
     const recentMessages = messages.slice(-6);
     const conversation = recentMessages.map(m => `${m.role}: ${m.content}`).join("\n");
 
@@ -159,10 +159,8 @@ REGRAS: Sem notas de IMDb/RT. Sem inventar filmes. Sem textão.`;
       );
     }
 
-    // Fire taste extraction in the background
-    if (userId && messages.length >= 2) {
-      extractTasteSignals(messages, userId, GEMINI_API_KEY).catch(() => {});
-    }
+    // Taste extraction will run inside the stream block after streaming completes
+    const shouldExtract = !!userId && messages.length >= 1;
 
     // Transform Gemini SSE stream to OpenAI-compatible SSE stream
     const { readable, writable } = new TransformStream();
@@ -204,7 +202,10 @@ REGRAS: Sem notas de IMDb/RT. Sem inventar filmes. Sem textão.`;
           }
         }
         await writer.write(encoder.encode("data: [DONE]\n\n"));
-      } catch (e) {
+        // Extract taste signals AFTER streaming completes (runtime still alive)
+        if (shouldExtract) {
+          await extractTasteSignals(messages, userId!, GEMINI_API_KEY);
+        }
         console.error("Stream transform error:", e);
       } finally {
         await writer.close();
