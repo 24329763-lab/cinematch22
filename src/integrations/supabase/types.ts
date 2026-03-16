@@ -142,6 +142,7 @@ export type Database = {
           preferred_era: string | null
           preferred_mood: string | null
           preferred_origin: string | null
+          taste_bio: string | null
           updated_at: string | null
           user_id: string
         }
@@ -156,6 +157,7 @@ export type Database = {
           preferred_era?: string | null
           preferred_mood?: string | null
           preferred_origin?: string | null
+          taste_bio?: string | null
           updated_at?: string | null
           user_id: string
         }
@@ -170,6 +172,7 @@ export type Database = {
           preferred_era?: string | null
           preferred_mood?: string | null
           preferred_origin?: string | null
+          taste_bio?: string | null
           updated_at?: string | null
           user_id?: string
         }
