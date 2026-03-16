@@ -5,7 +5,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import type { MoviePoster } from "@/lib/tmdb";
-import { useNavigate } from "react-router-dom";
 
 type Platform = "netflix" | "prime" | "disney";
 
@@ -21,25 +20,16 @@ const slugify = (t: string) =>
 const PosterCard = ({
   movie,
   index = 0,
-  size = "md",
+  onSelect,
 }: {
   movie: MoviePoster;
   index?: number;
-  size?: "sm" | "md" | "lg" | "hero";
+  onSelect?: (movie: MoviePoster) => void;
 }) => {
-  const [hovered, setHovered] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
   const [added, setAdded] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
-  const navigate = useNavigate();
-
-  const sizeClasses = {
-    sm: "w-[140px] h-[210px]",
-    md: "w-[180px] h-[270px]",
-    lg: "w-[220px] h-[330px]",
-    hero: "w-[260px] h-[390px]",
-  };
 
   const slug = slugify(movie.title);
 
@@ -77,11 +67,8 @@ const PosterCard = ({
       initial={{ opacity: 0, scale: 0.92 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.4, delay: index * 0.05, ease: [0.25, 0.46, 0.45, 0.94] }}
-      whileHover={{ scale: 1.04, y: -6 }}
-      className={`relative flex-shrink-0 ${sizeClasses[size]} rounded-2xl overflow-hidden cursor-pointer group`}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      onClick={() => navigate(`/movie/${slug}`)}
+      className="relative flex-shrink-0 w-[240px] h-[360px] rounded-2xl overflow-hidden cursor-pointer group/card peer"
+      onClick={() => onSelect?.(movie)}
       style={{ boxShadow: "0 8px 30px rgba(0,0,0,0.5)" }}
     >
       {!imgLoaded && <div className="absolute inset-0 shimmer rounded-2xl" />}
@@ -90,7 +77,7 @@ const PosterCard = ({
         src={movie.posterUrl}
         alt={movie.title}
         onLoad={() => setImgLoaded(true)}
-        className={`w-full h-full object-cover transition-all duration-700 ${imgLoaded ? "opacity-100" : "opacity-0"}`}
+        className={`w-full h-full object-cover transition-transform duration-500 group-hover/card:scale-110 ${imgLoaded ? "opacity-100" : "opacity-0"}`}
       />
 
       {/* Platform badges */}
@@ -114,31 +101,26 @@ const PosterCard = ({
       )}
 
       {/* Bottom gradient */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
 
       {/* Info */}
-      <div className="absolute bottom-0 left-0 right-0 p-3">
-        <h4 className="text-xs font-semibold leading-tight line-clamp-2 text-foreground drop-shadow-lg">
+      <div className="absolute bottom-0 left-0 right-0 p-3.5">
+        <h4 className="text-sm font-bold leading-tight line-clamp-2 text-foreground drop-shadow-lg">
           {movie.title}
         </h4>
         <div className="flex items-center gap-1.5 mt-1">
-          <Star size={10} className="text-cinema-gold fill-cinema-gold" />
-          <span className="text-[10px] font-semibold tabular-nums text-cinema-gold">{movie.rating.toFixed(1)}</span>
-          <span className="text-[10px] text-foreground/60 tabular-nums">{movie.year}</span>
+          <Star size={11} className="text-cinema-gold fill-cinema-gold" />
+          <span className="text-[11px] font-semibold tabular-nums text-cinema-gold">{movie.rating.toFixed(1)}</span>
+          <span className="text-[11px] text-foreground/60 tabular-nums">{movie.year}</span>
         </div>
       </div>
 
-      {/* Hover overlay - NO blur */}
-      <motion.div
-        initial={false}
-        animate={{ opacity: hovered ? 1 : 0 }}
-        transition={{ duration: 0.2 }}
-        className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center gap-2 pointer-events-none"
-      >
+      {/* Hover overlay - actions only, NO dark tint on this card */}
+      <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 opacity-0 group-hover/card:opacity-100 transition-opacity duration-300">
         <div className="w-12 h-12 rounded-full gradient-primary flex items-center justify-center cinema-glow-sm">
           <Play size={20} className="text-primary-foreground ml-0.5" fill="currentColor" />
         </div>
-        <div className="flex gap-2 pointer-events-auto">
+        <div className="flex gap-2">
           <button onClick={addToWatchlist} className="p-2 rounded-full glass text-foreground hover:bg-white/20 transition-all" title="Adicionar à lista">
             {added ? <Check size={14} /> : <Plus size={14} />}
           </button>
@@ -146,7 +128,7 @@ const PosterCard = ({
             <ExternalLink size={14} />
           </button>
         </div>
-      </motion.div>
+      </div>
     </motion.div>
   );
 };

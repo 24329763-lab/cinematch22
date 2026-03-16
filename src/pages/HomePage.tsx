@@ -1,11 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { TrendingUp, Clock, Sparkles, Flame, Heart, Globe, Star, Play, Plus, Check } from "lucide-react";
 import PosterCard from "@/components/PosterCard";
+import MovieDetailModal from "@/components/MovieDetailModal";
 import HorizontalScroll from "@/components/HorizontalScroll";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import type { MoviePoster } from "@/lib/tmdb";
 import {
   TRENDING, FOR_YOU, LEAVING_SOON, NEW_RELEASES, NETFLIX_ORIGINALS,
   MOVIE_BACKDROPS,
@@ -50,6 +52,7 @@ const HomePage = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [addedToList, setAddedToList] = useState(false);
+  const [selectedMovie, setSelectedMovie] = useState<MoviePoster | null>(null);
 
   const addHeroToWatchlist = async () => {
     if (!user) {
@@ -77,24 +80,35 @@ const HomePage = () => {
       {/* Dynamic background gradient from hero */}
       <div className="fixed inset-0 pointer-events-none -z-10">
         <div
-          className="absolute top-0 left-0 w-full h-[60vh]"
+          className="absolute top-0 left-0 w-full h-[70vh]"
           style={{
-            background: `radial-gradient(ellipse 80% 50% at 50% 0%, rgba(${HERO.dominantColor.r}, ${HERO.dominantColor.g}, ${HERO.dominantColor.b}, 0.15) 0%, transparent 70%)`,
+            background: `radial-gradient(ellipse 90% 60% at 50% 0%, rgba(${HERO.dominantColor.r}, ${HERO.dominantColor.g}, ${HERO.dominantColor.b}, 0.22) 0%, transparent 70%)`,
           }}
         />
-        <div className="absolute bottom-0 right-0 w-1/2 h-1/3 bg-primary/3 blur-[150px] rounded-full" />
+        <div
+          className="absolute top-[20%] right-0 w-[40%] h-[40%] rounded-full blur-[180px]"
+          style={{
+            background: `rgba(${HERO.dominantColor.r + 30}, ${HERO.dominantColor.g}, ${HERO.dominantColor.b + 40}, 0.08)`,
+          }}
+        />
+        <div
+          className="absolute bottom-[10%] left-[10%] w-[30%] h-[30%] rounded-full blur-[150px]"
+          style={{
+            background: `rgba(${HERO.dominantColor.r}, ${HERO.dominantColor.g + 20}, ${HERO.dominantColor.b + 20}, 0.06)`,
+          }}
+        />
       </div>
 
-      {/* Hero Card */}
-      <div className="px-4 pt-4">
+      {/* Hero Card - nearly full width */}
+      <div className="px-3 pt-3">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] }}
-          className="relative rounded-3xl overflow-hidden mx-auto max-w-5xl"
+          className="relative rounded-3xl overflow-hidden"
           style={{ boxShadow: "0 20px 60px rgba(0,0,0,0.6)" }}
         >
-          <div className="relative h-[420px]">
+          <div className="relative h-[65vh] min-h-[400px] max-h-[700px]">
             <img
               src={HERO.backdropUrl}
               alt={HERO.title}
@@ -103,7 +117,7 @@ const HomePage = () => {
             <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent" />
             <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-transparent to-transparent" />
 
-            <div className="absolute bottom-0 left-0 right-0 p-8">
+            <div className="absolute bottom-0 left-0 right-0 p-8 sm:p-10">
               <div className="flex items-center gap-2.5 mb-3">
                 <div className="w-6 h-6 rounded-full gradient-primary flex items-center justify-center cinema-glow-sm">
                   <Sparkles size={12} className="text-primary-foreground" />
@@ -113,7 +127,7 @@ const HomePage = () => {
                 </span>
               </div>
 
-              <h1 className="text-4xl font-black tracking-display mb-2 text-foreground">
+              <h1 className="text-5xl sm:text-6xl font-black tracking-display mb-3 text-foreground">
                 {HERO.title}
               </h1>
 
@@ -153,7 +167,7 @@ const HomePage = () => {
         <SectionHeader icon={TrendingUp} title="Em Alta no Brasil" />
         <HorizontalScroll>
           {TRENDING.map((movie, i) => (
-            <PosterCard key={movie.id} movie={movie} index={i} size="hero" />
+            <PosterCard key={movie.id} movie={movie} index={i} onSelect={setSelectedMovie} />
           ))}
         </HorizontalScroll>
       </section>
@@ -163,7 +177,7 @@ const HomePage = () => {
         <SectionHeader icon={Heart} title="Feito pra Você" subtitle="baseado no seu perfil" />
         <HorizontalScroll>
           {FOR_YOU.map((movie, i) => (
-            <PosterCard key={movie.id} movie={movie} index={i} size="lg" />
+            <PosterCard key={movie.id} movie={movie} index={i} onSelect={setSelectedMovie} />
           ))}
         </HorizontalScroll>
       </section>
@@ -173,7 +187,7 @@ const HomePage = () => {
         <SectionHeader icon={Clock} title="Saindo em Breve" subtitle="últimos dias" />
         <HorizontalScroll>
           {LEAVING_SOON.map((movie, i) => (
-            <PosterCard key={movie.id} movie={movie} index={i} size="lg" />
+            <PosterCard key={movie.id} movie={movie} index={i} onSelect={setSelectedMovie} />
           ))}
         </HorizontalScroll>
       </section>
@@ -183,7 +197,7 @@ const HomePage = () => {
         <SectionHeader icon={Flame} title="Lançamentos" />
         <HorizontalScroll>
           {NEW_RELEASES.map((movie, i) => (
-            <PosterCard key={movie.id} movie={movie} index={i} size="hero" />
+            <PosterCard key={movie.id} movie={movie} index={i} onSelect={setSelectedMovie} />
           ))}
         </HorizontalScroll>
       </section>
@@ -193,10 +207,15 @@ const HomePage = () => {
         <SectionHeader icon={Globe} title="Originais Netflix" />
         <HorizontalScroll>
           {NETFLIX_ORIGINALS.map((movie, i) => (
-            <PosterCard key={movie.id} movie={movie} index={i} size="lg" />
+            <PosterCard key={movie.id} movie={movie} index={i} onSelect={setSelectedMovie} />
           ))}
         </HorizontalScroll>
       </section>
+
+      {/* Movie Detail Modal */}
+      {selectedMovie && (
+        <MovieDetailModal movie={selectedMovie} onClose={() => setSelectedMovie(null)} />
+      )}
     </div>
   );
 };

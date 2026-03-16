@@ -138,6 +138,20 @@
 
   .scrollbar-hide::-webkit-scrollbar { display: none; }
   .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+  /* When any card in a scroll row is hovered, dim siblings */
+  .card-row:hover .group\/card:not(:hover) {
+    filter: brightness(0.6);
+    transition: filter 0.3s ease;
+  }
+  .card-row .group\/card {
+    transition: filter 0.3s ease, transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+  .card-row .group\/card:hover {
+    filter: brightness(1);
+    transform: scale(1.08);
+    z-index: 10;
+  }
 }
 
 @keyframes shimmer {
