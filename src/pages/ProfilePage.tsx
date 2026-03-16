@@ -108,6 +108,72 @@ const ProfilePage = () => {
     toast({ title: "Código copiado!" });
   };
 
+  const shareFriendCode = async () => {
+    const shareData = {
+      title: "Me adicione no CineMatch!",
+      text: `Use meu código de amizade: ${friendCode}`,
+    };
+    if (navigator.share) {
+      try { await navigator.share(shareData); } catch {}
+    } else {
+      copyFriendCode();
+    }
+  };
+
+  const regenerateCode = async () => {
+    if (!user) return;
+    setChangingCode(true);
+    try {
+      // Generate a new random code via DB function
+      const { data } = await supabase.rpc("generate_friend_code" as any);
+      const newCode = data as string;
+      if (!newCode) throw new Error("No code");
+      
+      const { error } = await supabase
+        .from("profiles")
+        .update({ friend_code: newCode } as any)
+        .eq("user_id", user.id);
+      
+      if (error) {
+        toast({ variant: "destructive", title: "Erro ao trocar código" });
+      } else {
+        setFriendCode(newCode);
+        toast({ title: "Código atualizado!" });
+      }
+    } catch {
+      toast({ variant: "destructive", title: "Erro ao gerar código" });
+    } finally {
+      setChangingCode(false);
+    }
+  };
+
+  const saveCustomCode = async () => {
+    if (!user || customCode.length < 4) return;
+    setChangingCode(true);
+    try {
+      const code = customCode.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
+      const { error } = await supabase
+        .from("profiles")
+        .update({ friend_code: code } as any)
+        .eq("user_id", user.id);
+      
+      if (error) {
+        if (error.code === "23505") {
+          toast({ variant: "destructive", title: "Esse código já está em uso" });
+        } else {
+          toast({ variant: "destructive", title: "Erro ao salvar código" });
+        }
+      } else {
+        setFriendCode(code);
+        setEditingCode(false);
+        setCustomCode("");
+        toast({ title: "Código personalizado salvo!" });
+      }
+    } finally {
+      setChangingCode(false);
+    }
+  };
+
   const sendInvite = async () => {
     if (!user || !inviteCode.trim()) return;
     setLoading(true);
