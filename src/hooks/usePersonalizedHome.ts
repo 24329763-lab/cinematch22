@@ -21,8 +21,13 @@ const POSTER_BASE = "https://image.tmdb.org/t/p/w500";
 function buildPosterUrl(movie: any): string {
   if (movie.posterUrl) return movie.posterUrl;
   if (movie.poster_path) return `${POSTER_BASE}${movie.poster_path}`;
-  const slug = movie.title.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-");
-  return `/posters/${slug}.jpg`;
+  const slug = movie.title
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-");
+  if (MOVIE_POSTERS[slug]) return MOVIE_POSTERS[slug];
+  return "/placeholder.svg";
 }
 
 export function usePersonalizedHome() {
