@@ -153,35 +153,10 @@
     z-index: 10;
   }
 
-  /* Responsive poster card sizing */
+  /* Fixed poster card sizing — same on all screens */
   .poster-card {
-    /* Mobile: bigger cards, ~2.5 visible */
-    width: 150px;
-    height: 225px;
-  }
-  @media (min-width: 640px) {
-    .poster-card {
-      width: 200px;
-      height: 300px;
-    }
-  }
-  @media (min-width: 768px) {
-    .poster-card {
-      width: 220px;
-      height: 330px;
-    }
-  }
-  @media (min-width: 1280px) {
-    .poster-card {
-      width: 260px;
-      height: 390px;
-    }
-  }
-  @media (min-width: 1536px) {
-    .poster-card {
-      width: 300px;
-      height: 450px;
-    }
+    width: 220px;
+    height: 330px;
   }
 }
 
