@@ -22,16 +22,6 @@ interface HeroMovie {
 
 const DEFAULT_HEROES: HeroMovie[] = [
   {
-    id: "hero-ainda-estou-aqui",
-    title: "Ainda Estou Aqui",
-    year: 2024,
-    rating: 8.1,
-    genres: ["Drama", "Histórico"],
-    description: "Fernanda Torres em performance aclamada mundialmente. Baseado na história real de Eunice Paiva durante a ditadura militar brasileira.",
-    backdropUrl: MOVIE_BACKDROPS["ainda-estou-aqui"] || "/posters/ainda-estou-aqui-backdrop.jpg",
-    posterUrl: "/posters/ainda-estou-aqui.jpg",
-  },
-  {
     id: "hero-parasita",
     title: "Parasita",
     year: 2019,
@@ -52,14 +42,24 @@ const DEFAULT_HEROES: HeroMovie[] = [
     posterUrl: "/posters/duna-2.jpg",
   },
   {
-    id: "hero-cidade-de-deus",
-    title: "Cidade de Deus",
-    year: 2002,
-    rating: 8.6,
-    genres: ["Crime", "Drama"],
-    description: "Dois meninos, dois caminhos opostos na favela mais perigosa do Rio. Um clássico absoluto do cinema brasileiro.",
-    backdropUrl: "/posters/cidade-de-deus.jpg",
-    posterUrl: "/posters/cidade-de-deus.jpg",
+    id: "hero-oppenheimer",
+    title: "Oppenheimer",
+    year: 2023,
+    rating: 8.3,
+    genres: ["Drama", "Biografia"],
+    description: "A história do homem que criou a bomba atômica e enfrentou as consequências morais de sua invenção. Christopher Nolan no auge.",
+    backdropUrl: "/posters/oppenheimer.jpg",
+    posterUrl: "/posters/oppenheimer.jpg",
+  },
+  {
+    id: "hero-whiplash",
+    title: "Whiplash",
+    year: 2014,
+    rating: 8.5,
+    genres: ["Drama", "Música"],
+    description: "Um jovem baterista de jazz é pressionado além dos limites por um instrutor abusivo em busca da perfeição.",
+    backdropUrl: "/posters/whiplash.jpg",
+    posterUrl: "/posters/whiplash.jpg",
   },
 ];
 
