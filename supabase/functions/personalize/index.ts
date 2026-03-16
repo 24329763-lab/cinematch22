@@ -451,3 +451,35 @@ function deterministicJitter(seed: string, modulo: number): number {
   }
   return Math.abs(hash % Math.max(1, modulo));
 }
+
+function repairJson(text: string): string {
+  let s = text.trim();
+  // Remove trailing incomplete strings/values
+  // Close open brackets/braces
+  const opens = { "{": "}", "[": "]" };
+  const closes = new Set(["}", "]"]);
+  const stack: string[] = [];
+  let inString = false;
+  let escape = false;
+
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (escape) { escape = false; continue; }
+    if (ch === "\\") { escape = true; continue; }
+    if (ch === '"') { inString = !inString; continue; }
+    if (inString) continue;
+    if (ch in opens) stack.push(opens[ch as "{" | "["]);
+    else if (closes.has(ch)) stack.pop();
+  }
+
+  // If inside a string, close it
+  if (inString) s += '"';
+
+  // Remove trailing comma
+  s = s.replace(/,\s*$/, "");
+
+  // Close remaining brackets
+  while (stack.length) s += stack.pop();
+
+  return s;
+}
