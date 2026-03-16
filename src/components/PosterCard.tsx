@@ -4,6 +4,7 @@ import { Star, Play, Plus, Check, ExternalLink } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useTasteCapture } from "@/hooks/useTasteCapture";
 import type { MoviePoster } from "@/lib/tmdb";
 
 type Platform = "netflix" | "prime" | "disney";
@@ -30,6 +31,7 @@ const PosterCard = ({
   const [added, setAdded] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
+  const { captureWatchlistAdd } = useTasteCapture();
 
   const slug = slugify(movie.title);
 
@@ -52,6 +54,7 @@ const PosterCard = ({
     if (!error) {
       setAdded(true);
       toast({ title: "Adicionado à sua lista!" });
+      captureWatchlistAdd(movie.title, movie.genres);
     }
   };
 
