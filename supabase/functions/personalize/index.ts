@@ -84,8 +84,28 @@ serve(async (req) => {
       ? Date.now() - new Date(existingRecs.generated_at).getTime() < SIX_HOURS_MS
       : false;
 
-    if (existingRecs && existingRecs.signals_count === profileVersion && profileVersion > 0 && isFresh) {
+    // Check if cached data has poster URLs
+    const cachedMovies = (existingRecs?.sections as any[])?.flatMap((s: any) => s.movies || []) || [];
+    const hasPosterUrls = cachedMovies.length > 0 && cachedMovies.every((m: any) => m.posterUrl && !m.posterUrl.includes("placeholder"));
+
+    if (existingRecs && existingRecs.signals_count === profileVersion && profileVersion > 0 && isFresh && hasPosterUrls) {
       return new Response(JSON.stringify(existingRecs), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // If we have cached data but missing posters, re-enrich without calling AI again
+    if (existingRecs && existingRecs.signals_count === profileVersion && profileVersion > 0 && !hasPosterUrls && TMDB_API_KEY) {
+      const sections = existingRecs.sections as any[];
+      const allCachedMovies = sections.flatMap((s: any) => s.movies || []);
+      await enrichWithTmdbPosters(allCachedMovies, TMDB_API_KEY);
+      
+      await serviceClient.from("home_recommendations").update({
+        sections: sections,
+        generated_at: existingRecs.generated_at, // keep original time
+      }).eq("user_id", user.id);
+
+      return new Response(JSON.stringify({ ...existingRecs, sections }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
