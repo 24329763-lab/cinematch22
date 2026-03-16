@@ -2,3 +2,6 @@ project_id = "jmrqopnvnhhxmsovfxzq"
 
 [functions.chat]
 verify_jwt = false
+
+[functions.tmdb-posters]
+verify_jwt = false

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Star, Plus, Check, ExternalLink, Play } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,13 +19,50 @@ export interface MovieRec {
 const slugify = (t: string) =>
   t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 
+// Cache TMDB poster lookups
+const posterCache: Record<string, string> = {};
+
 const MovieRecommendationCard = ({ movie, index = 0 }: { movie: MovieRec; index?: number }) => {
   const [added, setAdded] = useState(false);
+  const [posterUrl, setPosterUrl] = useState<string>("/placeholder.svg");
+  const [tmdbDescription, setTmdbDescription] = useState<string | null>(null);
   const { user } = useAuth();
   const { toast } = useToast();
 
   const slug = slugify(movie.title);
-  const posterUrl = MOVIE_POSTERS[slug] || "/placeholder.svg";
+
+  // Check local posters first, then fetch from TMDB
+  useEffect(() => {
+    const localPoster = MOVIE_POSTERS[slug];
+    if (localPoster) {
+      setPosterUrl(localPoster);
+      return;
+    }
+    if (posterCache[slug]) {
+      setPosterUrl(posterCache[slug]);
+      return;
+    }
+
+    // Fetch from TMDB
+    const fetchPoster = async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke("tmdb-posters", {
+          body: { titles: [movie.title] },
+        });
+        if (!error && data?.results?.[0]?.posterUrl) {
+          const url = data.results[0].posterUrl;
+          posterCache[slug] = url;
+          setPosterUrl(url);
+          if (data.results[0].overview && !movie.reason) {
+            setTmdbDescription(data.results[0].overview);
+          }
+        }
+      } catch {
+        // Silently fail, keep placeholder
+      }
+    };
+    fetchPoster();
+  }, [movie.title, slug, movie.reason]);
 
   const addToWatchlist = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -56,6 +93,8 @@ const MovieRecommendationCard = ({ movie, index = 0 }: { movie: MovieRec; index?
     toast({ title: "Link copiado!" });
   };
 
+  const displayDescription = movie.reason || tmdbDescription || movie.description;
+
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.92 }}
@@ -63,14 +102,13 @@ const MovieRecommendationCard = ({ movie, index = 0 }: { movie: MovieRec; index?
       transition={{ delay: index * 0.08 }}
       className="flex-shrink-0 w-[180px] sm:w-[200px] flex flex-col gap-2"
     >
-      {/* Poster - same style as main page cards */}
+      {/* Poster */}
       <div
         className="relative w-full aspect-[2/3] rounded-2xl overflow-hidden cursor-pointer group/rec"
         style={{ boxShadow: "0 8px 30px rgba(0,0,0,0.5)" }}
       >
         <img src={posterUrl} alt={movie.title} className="w-full h-full object-cover transition-transform duration-500 group-hover/rec:scale-110" />
 
-        {/* Platform badges */}
         {movie.platforms && movie.platforms.length > 0 && (
           <div className="absolute top-2 right-2 flex gap-1">
             {movie.platforms.map((p) => (
@@ -81,26 +119,17 @@ const MovieRecommendationCard = ({ movie, index = 0 }: { movie: MovieRec; index?
           </div>
         )}
 
-        {/* Bottom gradient */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
 
-        {/* Info overlay */}
         <div className="absolute bottom-0 left-0 right-0 p-3">
           <h4 className="text-sm font-bold leading-tight line-clamp-2 text-foreground drop-shadow-lg">
             {movie.title}
           </h4>
           <div className="flex items-center gap-1.5 mt-1">
-            {movie.rating && (
-              <>
-                <Star size={11} className="text-cinema-gold fill-cinema-gold" />
-                <span className="text-[11px] font-semibold tabular-nums text-cinema-gold">{movie.rating}</span>
-              </>
-            )}
             {movie.year && <span className="text-[11px] text-foreground/60 tabular-nums">{movie.year}</span>}
           </div>
         </div>
 
-        {/* Hover actions */}
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 opacity-0 group-hover/rec:opacity-100 transition-opacity duration-300">
           <div className="w-10 h-10 rounded-full gradient-primary flex items-center justify-center cinema-glow-sm">
             <Play size={16} className="text-primary-foreground ml-0.5" fill="currentColor" />
@@ -116,15 +145,10 @@ const MovieRecommendationCard = ({ movie, index = 0 }: { movie: MovieRec; index?
         </div>
       </div>
 
-      {/* Description underneath the card */}
-      {movie.reason && (
+      {/* Description underneath */}
+      {displayDescription && (
         <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3 px-1">
-          {movie.reason}
-        </p>
-      )}
-      {movie.description && !movie.reason && (
-        <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3 px-1">
-          {movie.description}
+          {displayDescription}
         </p>
       )}
     </motion.div>
@@ -133,28 +157,28 @@ const MovieRecommendationCard = ({ movie, index = 0 }: { movie: MovieRec; index?
 
 export default MovieRecommendationCard;
 
-// Parse AI response for movie recommendations
 export function parseMovieRecommendations(content: string): MovieRec[] {
   const movies: MovieRec[] = [];
+  // Match **Title** or **Title (Year)** with optional emojis
   const regex = /\*\*[🎬🎥🎞️]*\s*(.+?)\s*(?:\((\d{4})\))?\s*\*\*/g;
   let match;
   while ((match = regex.exec(content)) !== null) {
     const title = match[1].replace(/[🎬🎥🎞️]/g, "").trim();
     const year = match[2] ? parseInt(match[2]) : undefined;
     const afterMatch = content.slice(match.index, match.index + 500);
-    const ratingMatch = afterMatch.match(/⭐\s*([\d.]+)|IMDb[:\s]*([\d.]+)|nota[:\s]*([\d.]+)/i);
-    const rating = ratingMatch ? parseFloat(ratingMatch[1] || ratingMatch[2] || ratingMatch[3] || "0") : undefined;
+    
+    // Extract platforms
     const platforms: string[] = [];
     if (/netflix/i.test(afterMatch)) platforms.push("Netflix");
     if (/prime/i.test(afterMatch)) platforms.push("Prime");
     if (/disney/i.test(afterMatch)) platforms.push("Disney+");
 
-    // Extract description/reason - look for text after the bold title
-    const reasonMatch = afterMatch.match(/(?:\n|—|:)\s*(.{20,200}?)(?:\n\n|\n-|\n\*|$)/);
-    const reason = reasonMatch ? reasonMatch[1].replace(/\*\*/g, "").replace(/^[\s-:]+/, "").trim() : undefined;
+    // Extract reason/description
+    const reasonMatch = afterMatch.match(/\*\*[\s\S]*?\n+(.{20,250}?)(?:\n\n|\n-|\n\*|$)/);
+    const reason = reasonMatch ? reasonMatch[1].replace(/\*\*/g, "").replace(/^[\s\-:]+/, "").trim() : undefined;
 
     if (title.length > 1 && title.length < 80) {
-      movies.push({ title, year, rating, platforms, reason });
+      movies.push({ title, year, platforms, reason });
     }
   }
   return movies;
