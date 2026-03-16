@@ -18,7 +18,7 @@ function toGeminiMessages(messages: { role: string; content: string }[]) {
 
 async function extractTasteSignals(messages: { role: string; content: string }[], userId: string, apiKey: string) {
   try {
-    if (messages.length < 2) return;
+    if (messages.length < 1) return;
     const recentMessages = messages.slice(-6);
     const conversation = recentMessages.map(m => `${m.role}: ${m.content}`).join("\n");
 
