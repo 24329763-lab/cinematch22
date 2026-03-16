@@ -1,16 +1,14 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { TrendingUp, Clock, Sparkles, Flame, Heart, Globe, Star, Compass, Loader2 } from "lucide-react";
+import { Sparkles, Heart, Star, Compass, Flame, TrendingUp, Clock, Globe, Loader2, MessageCircle } from "lucide-react";
 import PosterCard from "@/components/PosterCard";
 import MovieDetailModal from "@/components/MovieDetailModal";
 import HorizontalScroll from "@/components/HorizontalScroll";
 import HeroCarousel from "@/components/HeroCarousel";
 import { useAuth } from "@/hooks/useAuth";
 import { usePersonalizedHome } from "@/hooks/usePersonalizedHome";
+import { useNavigate } from "react-router-dom";
 import type { MoviePoster } from "@/lib/tmdb";
-import {
-  TRENDING, FOR_YOU, LEAVING_SOON, NEW_RELEASES, NETFLIX_ORIGINALS,
-} from "@/lib/tmdb";
 
 const ICON_MAP: Record<string, React.ElementType> = {
   heart: Heart,
@@ -23,15 +21,7 @@ const ICON_MAP: Record<string, React.ElementType> = {
   sparkles: Sparkles,
 };
 
-const SectionHeader = ({
-  icon: Icon,
-  title,
-  subtitle,
-}: {
-  icon: React.ElementType;
-  title: string;
-  subtitle?: string;
-}) => (
+const SectionHeader = ({ icon: Icon, title, subtitle }: { icon: React.ElementType; title: string; subtitle?: string }) => (
   <div className="px-5 mb-4 flex items-center justify-between">
     <div className="flex items-center gap-2.5">
       <div className="w-7 h-7 rounded-lg gradient-primary flex items-center justify-center">
@@ -42,9 +32,35 @@ const SectionHeader = ({
         {subtitle && <span className="text-[11px] text-muted-foreground">{subtitle}</span>}
       </div>
     </div>
-    <button className="text-xs text-primary font-medium hover:underline">Ver Tudo</button>
   </div>
 );
+
+const ChatCTA = () => {
+  const navigate = useNavigate();
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="mx-5 mt-10 mb-4 glass-surface rounded-2xl p-6 text-center"
+    >
+      <div className="w-12 h-12 rounded-2xl gradient-primary flex items-center justify-center mx-auto mb-4 cinema-glow-sm">
+        <MessageCircle size={20} className="text-primary-foreground" />
+      </div>
+      <h3 className="text-lg font-bold text-foreground mb-2">Sua home pode ser muito melhor</h3>
+      <p className="text-sm text-muted-foreground leading-relaxed mb-4 max-w-sm mx-auto">
+        Converse com o chat sobre seus filmes favoritos, o que você curte e o que não curte — quanto mais eu souber, melhor fica sua home.
+      </p>
+      <button
+        onClick={() => navigate("/chat")}
+        className="gradient-primary text-primary-foreground px-6 py-3 rounded-full text-sm font-bold cinema-glow-sm hover:opacity-90 transition-opacity"
+      >
+        <span className="flex items-center gap-2">
+          <Sparkles size={14} /> Conversar agora
+        </span>
+      </button>
+    </motion.div>
+  );
+};
 
 const HomePage = () => {
   const { user } = useAuth();
@@ -53,17 +69,14 @@ const HomePage = () => {
 
   return (
     <div className="min-h-[calc(100dvh-4rem)] overflow-y-auto pb-24 relative">
-      {/* Background blurred gradient spots */}
       <div className="fixed inset-0 pointer-events-none -z-10 overflow-hidden">
         <div className="absolute top-[-10%] left-[-5%] w-[50%] h-[50%] rounded-full blur-[200px] opacity-20" style={{ background: "hsl(280, 70%, 50%)" }} />
         <div className="absolute top-[10%] right-[-10%] w-[45%] h-[45%] rounded-full blur-[200px] opacity-15" style={{ background: "hsl(330, 80%, 55%)" }} />
         <div className="absolute bottom-[5%] left-[20%] w-[40%] h-[35%] rounded-full blur-[180px] opacity-10" style={{ background: "hsl(260, 60%, 45%)" }} />
       </div>
 
-      {/* Hero Carousel */}
-      <HeroCarousel personalizedSections={personalizedSections} hasPersonalization={hasPersonalization} trendingMovies={TRENDING} />
+      <HeroCarousel personalizedSections={personalizedSections} hasPersonalization={hasPersonalization} />
 
-      {/* Personalization loading indicator */}
       {user && personalizationLoading && (
         <div className="flex items-center justify-center gap-2 mt-8 text-muted-foreground">
           <Loader2 size={16} className="animate-spin" />
@@ -71,7 +84,6 @@ const HomePage = () => {
         </div>
       )}
 
-      {/* Taste summary badge */}
       {tasteSummary && (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
@@ -88,7 +100,7 @@ const HomePage = () => {
         </motion.div>
       )}
 
-      {/* PERSONALIZED SECTIONS (when AI has learned about the user) */}
+      {/* Personalized sections only */}
       {hasPersonalization && personalizedSections.map((section, sIdx) => {
         const IconComp = ICON_MAP[section.icon] || Heart;
         return (
@@ -103,75 +115,12 @@ const HomePage = () => {
         );
       })}
 
-      {/* DEFAULT SECTIONS (for new users or logged-out) */}
-      {!hasPersonalization && (
-        <>
-          <section className="mt-10">
-            <SectionHeader icon={TrendingUp} title="Em Alta" />
-            <HorizontalScroll>
-              {TRENDING.map((movie, i) => (
-                <PosterCard key={movie.id} movie={movie} index={i} onSelect={setSelectedMovie} />
-              ))}
-            </HorizontalScroll>
-          </section>
-
-          {!user ? (
-            <section className="mt-10">
-              <SectionHeader icon={Heart} title="Feito pra Você" subtitle="baseado no seu perfil" />
-              <HorizontalScroll>
-                {FOR_YOU.map((movie, i) => (
-                  <PosterCard key={movie.id} movie={movie} index={i} onSelect={setSelectedMovie} />
-                ))}
-              </HorizontalScroll>
-            </section>
-          ) : (
-            <div className="mx-5 mt-10 glass rounded-2xl p-4">
-              <p className="text-sm text-foreground/80">
-                Estamos aprendendo seu gosto no chat para montar recomendações personalizadas de verdade.
-              </p>
-            </div>
-          )}
-
-          <section className="mt-10">
-            <SectionHeader icon={Clock} title="Saindo em Breve" subtitle="últimos dias" />
-            <HorizontalScroll>
-              {LEAVING_SOON.map((movie, i) => (
-                <PosterCard key={movie.id} movie={movie} index={i} onSelect={setSelectedMovie} />
-              ))}
-            </HorizontalScroll>
-          </section>
-
-          <section className="mt-10">
-            <SectionHeader icon={Flame} title="Lançamentos" />
-            <HorizontalScroll>
-              {NEW_RELEASES.map((movie, i) => (
-                <PosterCard key={movie.id} movie={movie} index={i} onSelect={setSelectedMovie} />
-              ))}
-            </HorizontalScroll>
-          </section>
-
-          <section className="mt-10 mb-4">
-            <SectionHeader icon={Globe} title="Originais Netflix" />
-            <HorizontalScroll>
-              {NETFLIX_ORIGINALS.map((movie, i) => (
-                <PosterCard key={movie.id} movie={movie} index={i} onSelect={setSelectedMovie} />
-              ))}
-            </HorizontalScroll>
-          </section>
-        </>
+      {/* Chat CTA when not enough personalized content */}
+      {user && !personalizationLoading && (!hasPersonalization || personalizedSections.length < 2) && (
+        <ChatCTA />
       )}
 
-      {/* Always show Trending even with personalization */}
-      {hasPersonalization && (
-        <section className="mt-10 mb-4">
-          <SectionHeader icon={TrendingUp} title="Em Alta" />
-          <HorizontalScroll>
-            {TRENDING.map((movie, i) => (
-              <PosterCard key={movie.id} movie={movie} index={i} onSelect={setSelectedMovie} />
-            ))}
-          </HorizontalScroll>
-        </section>
-      )}
+      {!user && <ChatCTA />}
 
       {selectedMovie && (
         <MovieDetailModal movie={selectedMovie} onClose={() => setSelectedMovie(null)} />
