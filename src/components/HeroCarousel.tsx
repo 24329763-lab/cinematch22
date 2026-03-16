@@ -151,12 +151,8 @@ export default function HeroCarousel({ personalizedSections, hasPersonalization 
       if (personal.length >= 2) return personal;
     }
 
-    if (trendingMovies.length > 0) {
-      return trendingMovies.map(movieToHero);
-    }
-
     return DEFAULT_HEROES;
-  }, [hasPersonalization, personalizedSections, trendingMovies]);
+  }, [hasPersonalization, personalizedSections]);
 
   const heroes = useMemo(() => {
     if (heroPool.length <= HERO_SET_SIZE) return heroPool;
