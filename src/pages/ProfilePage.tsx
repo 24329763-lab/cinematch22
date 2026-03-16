@@ -124,10 +124,12 @@ const ProfilePage = () => {
     if (!user) return;
     setChangingCode(true);
     try {
-      // Generate a new random code via DB function
-      const { data } = await supabase.rpc("generate_friend_code" as any);
-      const newCode = data as string;
-      if (!newCode) throw new Error("No code");
+      // Generate a random 6-char code client-side
+      const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+      let newCode = "";
+      for (let i = 0; i < 6; i++) {
+        newCode += chars[Math.floor(Math.random() * chars.length)];
+      }
       
       const { error } = await supabase
         .from("profiles")
@@ -135,13 +137,24 @@ const ProfilePage = () => {
         .eq("user_id", user.id);
       
       if (error) {
-        toast({ variant: "destructive", title: "Erro ao trocar código" });
+        if (error.code === "23505") {
+          // Collision - try once more
+          let retry = "";
+          for (let i = 0; i < 6; i++) retry += chars[Math.floor(Math.random() * chars.length)];
+          const { error: e2 } = await supabase.from("profiles").update({ friend_code: retry } as any).eq("user_id", user.id);
+          if (e2) {
+            toast({ variant: "destructive", title: "Tente novamente" });
+          } else {
+            setFriendCode(retry);
+            toast({ title: "Código atualizado!" });
+          }
+        } else {
+          toast({ variant: "destructive", title: "Erro ao trocar código" });
+        }
       } else {
         setFriendCode(newCode);
         toast({ title: "Código atualizado!" });
       }
-    } catch {
-      toast({ variant: "destructive", title: "Erro ao gerar código" });
     } finally {
       setChangingCode(false);
     }
