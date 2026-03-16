@@ -12,6 +12,7 @@ import AuthPage from "@/pages/AuthPage";
 import WatchlistPage from "@/pages/WatchlistPage";
 import WatchedPage from "@/pages/WatchedPage";
 import MoviePage from "@/pages/MoviePage";
+import PartyPage from "@/pages/PartyPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -29,6 +30,7 @@ const AppContent = () => {
         <Route path="/watchlist" element={<WatchlistPage />} />
         <Route path="/watched" element={<WatchedPage />} />
         <Route path="/movie/:slug" element={<MoviePage />} />
+        <Route path="/party/:friendId" element={<PartyPage />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
       <BottomNav />
