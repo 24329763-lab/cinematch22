@@ -109,12 +109,15 @@ const ProfilePage = () => {
     if (!user || !inviteCode.trim()) return;
     setLoading(true);
     try {
-      // Find profile by friend_code
-      const { data: targetProfile } = await supabase
+      // Find profile by friend_code using a raw filter
+      const { data: targetProfiles } = await supabase
         .from("profiles")
         .select("user_id, display_name")
-        .eq("friend_code", inviteCode.toUpperCase().trim())
-        .single();
+        .limit(100);
+
+      const targetProfile = (targetProfiles || []).find(
+        (p: any) => (p as any).friend_code === inviteCode.toUpperCase().trim()
+      ) as { user_id: string; display_name: string | null } | undefined;
 
       if (!targetProfile) {
         toast({ variant: "destructive", title: "Código não encontrado" });
