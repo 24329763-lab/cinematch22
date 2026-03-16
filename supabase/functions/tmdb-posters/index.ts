@@ -9,6 +9,15 @@ const corsHeaders = {
 const TMDB_BASE = "https://api.themoviedb.org/3";
 const IMG_BASE = "https://image.tmdb.org/t/p/w500";
 
+// Clean title for search: split on "/" or "—", try each part
+function extractSearchTerms(raw: string): string[] {
+  // "War Horse / Cavalo de Guerra" -> ["War Horse", "Cavalo de Guerra"]
+  // "Spirit: O Corcel Indomável" -> ["Spirit: O Corcel Indomável"]
+  const parts = raw.split(/\s*[\/—]\s*/).map(s => s.trim()).filter(Boolean);
+  if (parts.length === 0) return [raw.trim()];
+  return parts;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS")
     return new Response(null, { headers: corsHeaders });
@@ -25,24 +34,33 @@ serve(async (req) => {
       });
     }
 
-    // Search for each title in parallel
     const results = await Promise.all(
-      titles.slice(0, 10).map(async (title: string) => {
+      titles.slice(0, 10).map(async (rawTitle: string) => {
         try {
-          const url = `${TMDB_BASE}/search/movie?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(title)}&language=pt-BR&page=1`;
-          const resp = await fetch(url);
-          const data = await resp.json();
-          const movie = data.results?.[0];
-          if (!movie) return { title, posterUrl: null, year: null, overview: null };
-          return {
-            title,
-            posterUrl: movie.poster_path ? `${IMG_BASE}${movie.poster_path}` : null,
-            year: movie.release_date ? parseInt(movie.release_date.slice(0, 4)) : null,
-            overview: movie.overview || null,
-            tmdbId: movie.id,
-          };
+          const searchTerms = extractSearchTerms(rawTitle);
+          
+          for (const term of searchTerms) {
+            // Try pt-BR first, then en-US
+            for (const lang of ["pt-BR", "en-US"]) {
+              const url = `${TMDB_BASE}/search/movie?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(term)}&language=${lang}&page=1`;
+              const resp = await fetch(url);
+              const data = await resp.json();
+              const movie = data.results?.[0];
+              if (movie?.poster_path) {
+                return {
+                  title: rawTitle,
+                  posterUrl: `${IMG_BASE}${movie.poster_path}`,
+                  year: movie.release_date ? parseInt(movie.release_date.slice(0, 4)) : null,
+                  overview: movie.overview || null,
+                  tmdbId: movie.id,
+                };
+              }
+            }
+          }
+          
+          return { title: rawTitle, posterUrl: null, year: null, overview: null };
         } catch {
-          return { title, posterUrl: null, year: null, overview: null };
+          return { title: rawTitle, posterUrl: null, year: null, overview: null };
         }
       })
     );
