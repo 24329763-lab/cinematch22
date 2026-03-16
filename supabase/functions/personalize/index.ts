@@ -144,44 +144,16 @@ ${tasteNote}
 CONTEXTO:
 - Watchlist: ${watchlistTitles}
 - Já assistidos: ${watchedTitles}
-- Plataformas preferidas: ${profile?.platforms?.join(", ") || "Netflix, Prime Video, Disney+"}
+- Plataformas: ${profile?.platforms?.join(", ") || "Netflix, Prime Video, Disney+"}
 
-TAREFA:
-- Gere EXATAMENTE 4 seções personalizadas para a home
-- Cada seção com 5-6 filmes REAIS
-- Títulos e subtítulos precisam refletir diretamente os gostos do taste note
+TAREFA: Gere 3 seções personalizadas, cada uma com 4 filmes REAIS.
+- Títulos refletem o gosto do usuário
 - NÃO repetir filmes entre seções
 - NÃO incluir filmes já assistidos
+- matchPercent: 55-98 baseado no taste note real
 
-MATCH PERCENT:
-- Use o taste note para estimar compatibilidade real (não inventar números aleatórios)
-- Evite concentrar todos os filmes acima de 90%
-- Faixa recomendada por filme: 55-98
-
-FORMATO DE RESPOSTA (JSON válido):
-{
-  "taste_summary": "1-2 frases em PT-BR resumindo o gosto",
-  "sections": [
-    {
-      "key": "for-you",
-      "title": "...",
-      "subtitle": "...",
-      "icon": "heart|flame|compass|star",
-      "movies": [
-        {
-          "id": "slug",
-          "title": "...",
-          "year": 2024,
-          "rating": 8.1,
-          "genres": ["Drama"],
-          "platforms": ["netflix"],
-          "description": "...",
-          "matchPercent": 84
-        }
-      ]
-    }
-  ]
-}`;
+JSON OBRIGATÓRIO (sem texto extra):
+{"taste_summary":"...","sections":[{"key":"s1","title":"...","subtitle":"...","icon":"heart","movies":[{"id":"slug","title":"...","year":2024,"rating":8.1,"genres":["Drama"],"platforms":["netflix"],"description":"curta","matchPercent":84}]}]}`;
 
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
@@ -192,7 +164,7 @@ FORMATO DE RESPOSTA (JSON válido):
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
             temperature: 0.6,
-            maxOutputTokens: 4096,
+            maxOutputTokens: 8192,
             responseMimeType: "application/json",
           },
         }),
