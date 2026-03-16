@@ -157,7 +157,7 @@ const HomePage = () => {
 
       {/* Trending */}
       <section className="mt-10">
-        <SectionHeader icon={TrendingUp} title="Em Alta no Brasil" />
+        <SectionHeader icon={TrendingUp} title="Em Alta" />
         <HorizontalScroll>
           {TRENDING.map((movie, i) => (
             <PosterCard key={movie.id} movie={movie} index={i} onSelect={setSelectedMovie} />

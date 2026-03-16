@@ -18,10 +18,10 @@ type Message = {
 };
 
 const SUGGESTIONS = [
-  "Um terror psicológico brasileiro que não seja óbvio",
+  "Um terror psicológico que não seja óbvio",
   "Algo leve pra assistir com a família no domingo",
-  "Filmes parecidos com Cidade de Deus",
-  "Documentário brasileiro impactante",
+  "Filmes parecidos com Clube da Luta",
+  "Um documentário impactante pra maratonar",
 ];
 
 const ChatMovieScroll = ({ movies }: { movies: ReturnType<typeof parseMovieRecommendations> }) => {
