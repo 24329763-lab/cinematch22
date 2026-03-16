@@ -161,6 +161,11 @@ serve(async (req) => {
     const watchlistTitles = watchlist?.map((w) => w.title).join(", ") || "vazia";
     const watchedTitles = watched?.map((w) => `${w.title}${w.user_rating ? ` (${w.user_rating}★)` : ""}`).join(", ") || "vazio";
 
+    const watchedTitlesList = watched?.map(w => w.title).slice(0, 10) || [];
+    const becauseYouWatchedHint = watchedTitlesList.length > 0
+      ? `\nFilmes já assistidos pelo usuário (use para seções "Porque você assistiu X"): ${watchedTitlesList.join(", ")}`
+      : "";
+
     const prompt = `Você é um motor de recomendação de filmes para home page.
 
 PERFIL REAL DO USUÁRIO (TASTE NOTE):
@@ -170,16 +175,26 @@ CONTEXTO:
 - Watchlist: ${watchlistTitles}
 - Já assistidos: ${watchedTitles}
 - Plataformas: ${profile?.platforms?.join(", ") || "Netflix, Prime Video, Disney+"}
+${becauseYouWatchedHint}
 
-TAREFA: Gere 3 seções personalizadas, cada uma com **8 filmes REAIS** de qualquer país/língua.
-- Cada seção deve explorar um ASPECTO DIFERENTE do gosto do usuário (ex: um gênero, um tema, um mood, uma era diferente)
-- Títulos das seções refletem esses aspectos diferentes
-- NÃO forçar filmes brasileiros a menos que o perfil do usuário demonstre gostar especificamente de cinema brasileiro
+TAREFA: Gere EXATAMENTE 9 seções personalizadas, cada uma com **8 filmes REAIS** de qualquer país/língua.
+
+TIPOS DE SEÇÃO OBRIGATÓRIOS (use pelo menos 1 de cada tipo):
+1. "Porque você assistiu [Título]" — filmes similares a um filme que o usuário já assistiu (use watched list)
+2. MOOD — seções com títulos emocionais como "Pra um dia chuvoso e aconchegante", "Pra relaxar depois de um dia estressante", "Pra uma noite de insônia", "Pra chorar sem culpa"
+3. GÊNERO — seções baseadas em gêneros que o usuário demonstrou gostar
+4. TEMA/ESTILO — seções baseadas em temas específicos do perfil (ex: "Protagonistas obsessivos", "Mundos distópicos")
+5. DESCOBERTA — "Você provavelmente não conhece, mas vai amar" — filmes menos conhecidos que combinam
+
+REGRAS:
+- Títulos das seções devem ser CRIATIVOS e emocionais, não genéricos
+- NÃO forçar filmes brasileiros a menos que o perfil demonstre gostar
 - NÃO repetir filmes entre seções
-- NÃO incluir filmes já assistidos
-- Explore filmes internacionais variados (Hollywood, europeus, asiáticos, etc.) que COMBINEM com o perfil
+- NÃO incluir filmes já assistidos ou na watchlist
+- Explore filmes internacionais variados que COMBINEM com o perfil
 - matchPercent: 55-98 baseado no taste note real
 - Cada filme DEVE ter o campo "tmdb_title" com o título original/internacional para busca no TMDB
+- Icons possíveis: heart, flame, compass, star, trending, clock, globe, sparkles
 
 JSON OBRIGATÓRIO (sem texto extra):
 {"taste_summary":"...","sections":[{"key":"s1","title":"...","subtitle":"...","icon":"heart","movies":[{"id":"slug","title":"...","tmdb_title":"...","year":2024,"rating":8.1,"genres":["Drama"],"platforms":["netflix"],"description":"uma frase curta","matchPercent":84}]}]}`;

@@ -7,30 +7,29 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse";
+const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
 
-function toGeminiMessages(messages: { role: string; content: string }[]) {
-  return messages.map(m => ({
-    role: m.role === "assistant" ? "model" : "user",
-    parts: [{ text: m.content }],
-  }));
-}
-
-async function extractTasteSignals(messages: { role: string; content: string }[], userId: string, apiKey: string) {
+async function extractTasteSignals(messages: { role: string; content: string }[], userId: string) {
   try {
     if (messages.length < 1) return;
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) return;
+
     const recentMessages = messages.slice(-6);
     const conversation = recentMessages.map(m => `${m.role}: ${m.content}`).join("\n");
 
-    const resp = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{
-               text: `Analise esta conversa sobre filmes e extraia sinais de gosto do USUÁRIO (não do assistente).
+    const resp = await fetch(GATEWAY_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash-lite",
+        messages: [
+          {
+            role: "user",
+            content: `Analise esta conversa sobre filmes e extraia sinais de gosto do USUÁRIO (não do assistente).
 
 CONVERSA:
 ${conversation}
@@ -50,30 +49,34 @@ Categorias:
 - setting (guerra, espaço, floresta, cidade, etc)
 - topic (política, filosofia, romance, etc)
 
-IMPORTANTE: Capture TUDO que a pessoa mencionar gostar ou não gostar, incluindo coisas não-cinematográficas como animais, objetos, cenários específicos, personagens arquetípicos, temas que a pessoa odeia.
+IMPORTANTE: Capture TUDO que a pessoa mencionar gostar ou não gostar.
 
 Responda APENAS em JSON válido:
 {
   "signals": [
-    {"signal_type": "like", "category": "genre", "value": "terror psicológico", "confidence": 0.9},
-    {"signal_type": "avoid", "category": "element", "value": "violência com animais", "confidence": 0.95}
+    {"signal_type": "like", "category": "genre", "value": "terror psicológico", "confidence": 0.9}
   ]
 }
 
 Se não houver sinais claros, retorne {"signals": []}`,
-            }],
-          }],
-          generationConfig: { temperature: 0.3, maxOutputTokens: 500, responseMimeType: "application/json" },
-        }),
-      }
-    );
+          },
+        ],
+        temperature: 0.3,
+        max_tokens: 500,
+      }),
+    });
 
     if (!resp.ok) return;
     const data = await resp.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    const text = data.choices?.[0]?.message?.content;
     if (!text) return;
 
-    const { signals } = JSON.parse(text);
+    // Extract JSON from possible markdown code blocks
+    let jsonStr = text;
+    const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (jsonMatch) jsonStr = jsonMatch[1];
+
+    const { signals } = JSON.parse(jsonStr.trim());
     if (!signals || signals.length === 0) return;
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -102,8 +105,8 @@ serve(async (req) => {
 
   try {
     const { messages } = await req.json();
-    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
-    if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY is not configured");
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
     // Try to get user ID for taste extraction
     let userId: string | null = null;
@@ -120,11 +123,11 @@ serve(async (req) => {
       } catch { /* ignore */ }
     }
 
-    // Detect conversation mode from messages
+    // Detect conversation mode
     const lastUserMsg = messages.filter((m: any) => m.role === "user").pop()?.content?.toLowerCase() || "";
     const isTasteMode = /\b(meu gosto|gosto em filmes|que tipo de filme|me conhecer|perfil|preferências|o que eu curto|entender meu gosto|conversar sobre|quero conversar)\b/i.test(lastUserMsg);
 
-    const systemInstruction = `Você é o CineMatch — conciso, esperto, cinéfilo. Português brasileiro sempre.
+    const systemPrompt = `Você é o CineMatch — conciso, esperto, cinéfilo. Português brasileiro sempre.
 
 Seja direto. Nada de introduções longas ou explicações óbvias. Fale como um amigo que manja de cinema, não como um robô.
 
@@ -148,25 +151,35 @@ ${isTasteMode ? `MODO PERFIL DE GOSTO (ativo agora):
 
 REGRAS GERAIS: Sem notas de IMDb/RT. Sem inventar filmes. Sem textão.`;
 
-    const geminiMessages = toGeminiMessages(messages);
-
-    const response = await fetch(`${GEMINI_URL}&key=${GEMINI_API_KEY}`, {
+    const response = await fetch(GATEWAY_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({
-        system_instruction: { parts: [{ text: systemInstruction }] },
-        contents: geminiMessages,
-        generationConfig: { temperature: 0.9, maxOutputTokens: 4096 },
+        model: "google/gemini-3-flash-preview",
+        messages: [
+          { role: "system", content: systemPrompt },
+          ...messages,
+        ],
+        stream: true,
       }),
     });
 
     if (!response.ok) {
       const t = await response.text();
-      console.error("Gemini error:", response.status, t);
+      console.error("Gateway error:", response.status, t);
       if (response.status === 429) {
         return new Response(
           JSON.stringify({ error: "Rate limit exceeded. Tente novamente em alguns segundos." }),
           { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      if (response.status === 402) {
+        return new Response(
+          JSON.stringify({ error: "Créditos insuficientes. Adicione créditos ao workspace." }),
+          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
       return new Response(
@@ -175,10 +188,11 @@ REGRAS GERAIS: Sem notas de IMDb/RT. Sem inventar filmes. Sem textão.`;
       );
     }
 
-    // Taste extraction will run inside the stream block after streaming completes
+    // Taste extraction runs after stream completes
     const shouldExtract = !!userId && messages.length >= 1;
 
-    // Transform Gemini SSE stream to OpenAI-compatible SSE stream
+    // Gateway already returns OpenAI-compatible SSE, pass through directly
+    // but we need to tap into the stream for taste extraction
     const { readable, writable } = new TransformStream();
     const writer = writable.getWriter();
     const encoder = new TextEncoder();
@@ -188,42 +202,40 @@ REGRAS GERAIS: Sem notas de IMDb/RT. Sem inventar filmes. Sem textão.`;
         const reader = response.body!.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
+        let fullResponse = "";
 
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
-          buffer += decoder.decode(value, { stream: true });
+          const chunk = decoder.decode(value, { stream: true });
+          buffer += chunk;
 
+          // Pass through to client
+          await writer.write(encoder.encode(chunk));
+
+          // Collect full response for taste extraction
           let newlineIdx: number;
-          while ((newlineIdx = buffer.indexOf("\n")) !== -1) {
-            let line = buffer.slice(0, newlineIdx);
-            buffer = buffer.slice(newlineIdx + 1);
-            if (line.endsWith("\r")) line = line.slice(0, -1);
+          const tempBuf = buffer;
+          buffer = "";
+          for (const line of tempBuf.split("\n")) {
             if (!line.startsWith("data: ")) continue;
-
             const jsonStr = line.slice(6).trim();
             if (!jsonStr || jsonStr === "[DONE]") continue;
-
             try {
               const parsed = JSON.parse(jsonStr);
-              const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
-              if (text) {
-                // Convert to OpenAI-compatible format
-                const openAIChunk = {
-                  choices: [{ delta: { content: text }, index: 0 }],
-                };
-                await writer.write(encoder.encode(`data: ${JSON.stringify(openAIChunk)}\n\n`));
-              }
-            } catch { /* skip malformed */ }
+              const content = parsed.choices?.[0]?.delta?.content;
+              if (content) fullResponse += content;
+            } catch { /* skip */ }
           }
         }
-        await writer.write(encoder.encode("data: [DONE]\n\n"));
-        // Extract taste signals AFTER streaming completes (runtime still alive)
-        if (shouldExtract) {
-          await extractTasteSignals(messages, userId!, GEMINI_API_KEY);
+
+        // Extract taste signals after streaming completes
+        if (shouldExtract && fullResponse) {
+          const allMsgs = [...messages, { role: "assistant", content: fullResponse }];
+          await extractTasteSignals(allMsgs, userId!);
         }
       } catch (e) {
-        console.error("Stream transform error:", e);
+        console.error("Stream error:", e);
       } finally {
         await writer.close();
       }
