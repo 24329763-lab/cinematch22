@@ -1,71 +1,16 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { TrendingUp, Clock, Sparkles, Flame, Heart, Globe, Star, Play, Plus, Check, Compass, Loader2 } from "lucide-react";
+import { TrendingUp, Clock, Sparkles, Flame, Heart, Globe, Star, Compass, Loader2 } from "lucide-react";
 import PosterCard from "@/components/PosterCard";
 import MovieDetailModal from "@/components/MovieDetailModal";
 import HorizontalScroll from "@/components/HorizontalScroll";
+import HeroCarousel from "@/components/HeroCarousel";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
-import { useTasteCapture } from "@/hooks/useTasteCapture";
 import { usePersonalizedHome } from "@/hooks/usePersonalizedHome";
 import type { MoviePoster } from "@/lib/tmdb";
 import {
   TRENDING, FOR_YOU, LEAVING_SOON, NEW_RELEASES, NETFLIX_ORIGINALS,
-  MOVIE_BACKDROPS,
 } from "@/lib/tmdb";
-
-const HEROES = [
-  {
-    id: "hero-ainda-estou-aqui",
-    title: "Ainda Estou Aqui",
-    year: 2024,
-    rating: 8.1,
-    genres: ["Drama", "Histórico"],
-    description: "Fernanda Torres em performance aclamada mundialmente. Baseado na história real de Eunice Paiva durante a ditadura militar brasileira.",
-    backdropUrl: MOVIE_BACKDROPS["ainda-estou-aqui"] || "/posters/ainda-estou-aqui-backdrop.jpg",
-    posterUrl: "/posters/ainda-estou-aqui.jpg",
-  },
-  {
-    id: "hero-parasita",
-    title: "Parasita",
-    year: 2019,
-    rating: 8.5,
-    genres: ["Suspense", "Drama"],
-    description: "Uma família pobre se infiltra na vida de uma família rica. Vencedor do Oscar de Melhor Filme — Bong Joon-ho no seu melhor.",
-    backdropUrl: "/posters/parasita.jpg",
-    posterUrl: "/posters/parasita.jpg",
-  },
-  {
-    id: "hero-duna-2",
-    title: "Duna: Parte 2",
-    year: 2024,
-    rating: 8.1,
-    genres: ["Ficção Científica", "Épico"],
-    description: "Paul Atreides se une aos Fremen numa jornada épica. Denis Villeneuve entrega uma das maiores experiências visuais do cinema.",
-    backdropUrl: "/posters/duna-2.jpg",
-    posterUrl: "/posters/duna-2.jpg",
-  },
-  {
-    id: "hero-cidade-de-deus",
-    title: "Cidade de Deus",
-    year: 2002,
-    rating: 8.6,
-    genres: ["Crime", "Drama"],
-    description: "Dois meninos, dois caminhos opostos na favela mais perigosa do Rio. Um clássico absoluto do cinema brasileiro.",
-    backdropUrl: "/posters/cidade-de-deus.jpg",
-    posterUrl: "/posters/cidade-de-deus.jpg",
-  },
-];
-
-// Rotate hero based on day + hour-block (changes every 6 hours, no API cost)
-function getHeroIndex(): number {
-  const now = new Date();
-  const seed = now.getFullYear() * 1000 + Math.floor(now.getTime() / (1000 * 60 * 60 * 6));
-  return seed % HEROES.length;
-}
-
-const HERO = HEROES[getHeroIndex()];
 
 const ICON_MAP: Record<string, React.ElementType> = {
   heart: Heart,
