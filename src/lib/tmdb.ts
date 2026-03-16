@@ -48,12 +48,12 @@ export const TRENDING: MoviePoster[] = [
 ];
 
 export const FOR_YOU: MoviePoster[] = [
-  { id: "f1", title: "Cidade de Deus", year: 2002, rating: 8.6, posterUrl: MOVIE_POSTERS["cidade-de-deus"], platforms: ["netflix"], genres: ["Crime", "Drama"], matchPercent: 94, description: "Dois garotos crescem na Cidade de Deus, no Rio de Janeiro, e seguem caminhos opostos: um se torna fotógrafo, o outro, traficante." },
-  { id: "f2", title: "Bacurau", year: 2019, rating: 7.4, posterUrl: MOVIE_POSTERS["bacurau"], platforms: ["prime"], genres: ["Ação", "Suspense"], matchPercent: 91, description: "Um pequeno povoado no sertão nordestino misteriosamente desaparece do mapa e seus habitantes precisam lutar para sobreviver." },
-  { id: "f3", title: "Central do Brasil", year: 1998, rating: 8.0, posterUrl: MOVIE_POSTERS["central-do-brasil"], platforms: ["prime"], genres: ["Drama"], matchPercent: 87, description: "Uma mulher amargurada leva um menino órfão numa viagem pelo interior do Brasil em busca do pai que ele nunca conheceu." },
-  { id: "f4", title: "Tropa de Elite", year: 2007, rating: 8.0, posterUrl: MOVIE_POSTERS["tropa-de-elite"], platforms: ["netflix"], genres: ["Ação", "Crime"], matchPercent: 85, description: "O Capitão Nascimento do BOPE precisa encontrar um substituto enquanto enfrenta a guerra contra o tráfico nas favelas do Rio." },
-  { id: "f5", title: "Aquarius", year: 2016, rating: 7.5, posterUrl: MOVIE_POSTERS["aquarius"], platforms: ["prime"], genres: ["Drama"], matchPercent: 82, description: "Clara, uma crítica musical aposentada, é a última moradora de um edifício em Recife e resiste à pressão de uma construtora." },
-  { id: "f6", title: "O Auto da Compadecida", year: 2000, rating: 8.3, posterUrl: MOVIE_POSTERS["o-auto-da-compadecida"], platforms: ["disney"], genres: ["Comédia"], matchPercent: 80, description: "João Grilo e Chicó vivem aventuras hilariantes no sertão nordestino, usando a esperteza para sobreviver." },
+  { id: "f1", title: "Cidade de Deus", year: 2002, rating: 8.6, posterUrl: MOVIE_POSTERS["cidade-de-deus"], platforms: ["netflix"], genres: ["Crime", "Drama"], description: "Dois garotos crescem na Cidade de Deus, no Rio de Janeiro, e seguem caminhos opostos: um se torna fotógrafo, o outro, traficante." },
+  { id: "f2", title: "Bacurau", year: 2019, rating: 7.4, posterUrl: MOVIE_POSTERS["bacurau"], platforms: ["prime"], genres: ["Ação", "Suspense"], description: "Um pequeno povoado no sertão nordestino misteriosamente desaparece do mapa e seus habitantes precisam lutar para sobreviver." },
+  { id: "f3", title: "Central do Brasil", year: 1998, rating: 8.0, posterUrl: MOVIE_POSTERS["central-do-brasil"], platforms: ["prime"], genres: ["Drama"], description: "Uma mulher amargurada leva um menino órfão numa viagem pelo interior do Brasil em busca do pai que ele nunca conheceu." },
+  { id: "f4", title: "Tropa de Elite", year: 2007, rating: 8.0, posterUrl: MOVIE_POSTERS["tropa-de-elite"], platforms: ["netflix"], genres: ["Ação", "Crime"], description: "O Capitão Nascimento do BOPE precisa encontrar um substituto enquanto enfrenta a guerra contra o tráfico nas favelas do Rio." },
+  { id: "f5", title: "Aquarius", year: 2016, rating: 7.5, posterUrl: MOVIE_POSTERS["aquarius"], platforms: ["prime"], genres: ["Drama"], description: "Clara, uma crítica musical aposentada, é a última moradora de um edifício em Recife e resiste à pressão de uma construtora." },
+  { id: "f6", title: "O Auto da Compadecida", year: 2000, rating: 8.3, posterUrl: MOVIE_POSTERS["o-auto-da-compadecida"], platforms: ["disney"], genres: ["Comédia"], description: "João Grilo e Chicó vivem aventuras hilariantes no sertão nordestino, usando a esperteza para sobreviver." },
 ];
 
 export const LEAVING_SOON: MoviePoster[] = [

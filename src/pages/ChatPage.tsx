@@ -7,7 +7,9 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import ChatSidebar, { type Conversation } from "@/components/ChatSidebar";
-import MovieRecommendationCard, { parseMovieRecommendations } from "@/components/MovieRecommendationCard";
+import MovieRecommendationCard, { parseMovieRecommendations, type MovieRec } from "@/components/MovieRecommendationCard";
+import MovieDetailModal from "@/components/MovieDetailModal";
+import type { MoviePoster } from "@/lib/tmdb";
 
 type Message = {
   id: string;
@@ -24,7 +26,26 @@ const SUGGESTIONS = [
   { text: "Me ajuda a entender que tipo de filme eu curto", icon: MessageCircle },
 ];
 
-const ChatMovieScroll = ({ movies }: { movies: ReturnType<typeof parseMovieRecommendations> }) => {
+function movieRecToMoviePoster(movie: MovieRec, posterUrl: string): MoviePoster {
+  return {
+    id: movie.title.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+    title: movie.title,
+    year: movie.year || 2024,
+    rating: movie.rating || 7.5,
+    posterUrl,
+    platforms: (movie.platforms || []).map((p) => {
+      const key = p.toLowerCase().replace(/\s+/g, "");
+      if (key.includes("netflix")) return "netflix";
+      if (key.includes("prime")) return "prime";
+      if (key.includes("disney")) return "disney";
+      return "netflix" as const;
+    }) as ("netflix" | "prime" | "disney")[],
+    genres: movie.genres || [],
+    description: movie.reason || movie.description,
+  };
+}
+
+const ChatMovieScroll = ({ movies, onOpenDetail }: { movies: MovieRec[]; onOpenDetail: (movie: MovieRec, posterUrl: string) => void }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const scroll = (dir: "left" | "right") => {
@@ -45,7 +66,7 @@ const ChatMovieScroll = ({ movies }: { movies: ReturnType<typeof parseMovieRecom
 
       <div ref={scrollRef} className="flex gap-4 overflow-x-auto scrollbar-hide px-4 py-2 scroll-smooth">
         {movies.map((movie, i) => (
-          <MovieRecommendationCard key={movie.title + i} movie={movie} index={i} />
+          <MovieRecommendationCard key={movie.title + i} movie={movie} index={i} onOpenDetail={onOpenDetail} />
         ))}
       </div>
 
@@ -68,6 +89,7 @@ const ChatPage = () => {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConvId, setActiveConvId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [selectedMovie, setSelectedMovie] = useState<MoviePoster | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const { user } = useAuth();
@@ -176,10 +198,13 @@ const ChatPage = () => {
     if (activeConvId === id) handleNewConversation();
   };
 
+  const handleOpenMovieDetail = (movie: MovieRec, posterUrl: string) => {
+    setSelectedMovie(movieRecToMoviePoster(movie, posterUrl));
+  };
+
   const renderAssistantMessage = (msg: Message) => {
     const movieRecs = msg.id !== "streaming" ? parseMovieRecommendations(msg.content) : [];
 
-    // Extract intro (before first movie) and follow-up (last line with ?)
     const lines = msg.content.split("\n").filter(l => l.trim());
     const lastLine = lines[lines.length - 1]?.trim() || "";
     const hasFollowUp = movieRecs.length > 0 && lastLine.includes("?") && !lastLine.startsWith("**");
@@ -200,7 +225,7 @@ const ChatPage = () => {
               ) : null;
             })()}
 
-            <ChatMovieScroll movies={movieRecs} />
+            <ChatMovieScroll movies={movieRecs} onOpenDetail={handleOpenMovieDetail} />
 
             {hasFollowUp && (
               <div className="glass rounded-2xl p-4 max-w-[90%]">
@@ -313,6 +338,10 @@ const ChatPage = () => {
           </div>
         </div>
       </div>
+
+      {selectedMovie && (
+        <MovieDetailModal movie={selectedMovie} onClose={() => setSelectedMovie(null)} />
+      )}
     </div>
   );
 };
