@@ -71,7 +71,7 @@ export function usePersonalizedHome() {
             title: m.title,
             year: m.year,
             rating: m.rating,
-            posterUrl: buildPosterUrl(m),
+            posterUrl: m.posterUrl || buildPosterUrl(m),
             platforms: m.platforms || ["netflix"],
             genres: m.genres || [],
             matchPercent: typeof m.matchPercent === "number" ? m.matchPercent : undefined,
