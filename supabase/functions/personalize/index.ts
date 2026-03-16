@@ -71,7 +71,9 @@ serve(async (req) => {
 
     const signalRows = (signals || []) as TasteSignal[];
     const signalCount = signalRows.length;
-    const profileVersion = signalCount * 1000 + userMessages.length * 10 + (watchlist?.length || 0) + (watched?.length || 0);
+    const tasteBio = (profile as any)?.taste_bio || "";
+    // Profile version changes only on significant data changes (new signals, new watched/watchlist items, taste_bio changes)
+    const profileVersion = signalCount * 1000 + userMessages.length * 10 + (watchlist?.length || 0) + (watched?.length || 0) + (tasteBio.length > 0 ? 1 : 0);
 
     const { data: existingRecs } = await serviceClient
       .from("home_recommendations")
@@ -79,15 +81,17 @@ serve(async (req) => {
       .eq("user_id", user.id)
       .single();
 
-    const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
+    // Cache for 24 hours instead of 6 — home should be stable
+    const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
     const isFresh = existingRecs?.generated_at
-      ? Date.now() - new Date(existingRecs.generated_at).getTime() < SIX_HOURS_MS
+      ? Date.now() - new Date(existingRecs.generated_at).getTime() < TWENTY_FOUR_HOURS_MS
       : false;
 
     // Check if cached data has poster URLs
     const cachedMovies = (existingRecs?.sections as any[])?.flatMap((s: any) => s.movies || []) || [];
     const hasPosterUrls = cachedMovies.length > 0 && cachedMovies.every((m: any) => m.posterUrl && !m.posterUrl.includes("placeholder"));
 
+    // Only regenerate if profile version changed significantly (new taste data) or cache expired
     if (existingRecs && existingRecs.signals_count === profileVersion && profileVersion > 0 && isFresh && hasPosterUrls) {
       return new Response(JSON.stringify(existingRecs), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
