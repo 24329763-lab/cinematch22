@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import { User, Film, Heart, Users, LogOut, Copy, UserPlus, Check, X, Loader2, Sparkles } from "lucide-react";
+import { User, Film, Heart, Users, LogOut, Copy, UserPlus, Check, X, Loader2, Sparkles, RefreshCw, Share2, Pencil } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
@@ -32,6 +32,9 @@ const ProfilePage = () => {
   const [friends, setFriends] = useState<FriendProfile[]>([]);
   const [pendingInvites, setPendingInvites] = useState<Invite[]>([]);
   const [loading, setLoading] = useState(false);
+  const [changingCode, setChangingCode] = useState(false);
+  const [editingCode, setEditingCode] = useState(false);
+  const [customCode, setCustomCode] = useState("");
 
   useEffect(() => {
     if (!user) return;
@@ -103,6 +106,72 @@ const ProfilePage = () => {
   const copyFriendCode = () => {
     navigator.clipboard.writeText(friendCode);
     toast({ title: "Código copiado!" });
+  };
+
+  const shareFriendCode = async () => {
+    const shareData = {
+      title: "Me adicione no CineMatch!",
+      text: `Use meu código de amizade: ${friendCode}`,
+    };
+    if (navigator.share) {
+      try { await navigator.share(shareData); } catch {}
+    } else {
+      copyFriendCode();
+    }
+  };
+
+  const regenerateCode = async () => {
+    if (!user) return;
+    setChangingCode(true);
+    try {
+      // Generate a new random code via DB function
+      const { data } = await supabase.rpc("generate_friend_code" as any);
+      const newCode = data as string;
+      if (!newCode) throw new Error("No code");
+      
+      const { error } = await supabase
+        .from("profiles")
+        .update({ friend_code: newCode } as any)
+        .eq("user_id", user.id);
+      
+      if (error) {
+        toast({ variant: "destructive", title: "Erro ao trocar código" });
+      } else {
+        setFriendCode(newCode);
+        toast({ title: "Código atualizado!" });
+      }
+    } catch {
+      toast({ variant: "destructive", title: "Erro ao gerar código" });
+    } finally {
+      setChangingCode(false);
+    }
+  };
+
+  const saveCustomCode = async () => {
+    if (!user || customCode.length < 4) return;
+    setChangingCode(true);
+    try {
+      const code = customCode.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
+      const { error } = await supabase
+        .from("profiles")
+        .update({ friend_code: code } as any)
+        .eq("user_id", user.id);
+      
+      if (error) {
+        if (error.code === "23505") {
+          toast({ variant: "destructive", title: "Esse código já está em uso" });
+        } else {
+          toast({ variant: "destructive", title: "Erro ao salvar código" });
+        }
+      } else {
+        setFriendCode(code);
+        setEditingCode(false);
+        setCustomCode("");
+        toast({ title: "Código personalizado salvo!" });
+      }
+    } finally {
+      setChangingCode(false);
+    }
   };
 
   const sendInvite = async () => {
@@ -201,12 +270,64 @@ const ProfilePage = () => {
               <UserPlus size={16} className="text-primary" />
               <h3 className="text-sm font-bold">Seu Código de Amizade</h3>
             </div>
-            <div className="flex items-center gap-3">
-              <span className="text-2xl font-black tracking-[0.3em] gradient-text">{friendCode}</span>
-              <button onClick={copyFriendCode} className="p-2 rounded-xl glass text-muted-foreground hover:text-foreground transition-all">
-                <Copy size={16} />
-              </button>
-            </div>
+            
+            {editingCode ? (
+              <div className="space-y-3">
+                <input
+                  value={customCode}
+                  onChange={(e) => setCustomCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))}
+                  placeholder="Novo código (4-8 caracteres)"
+                  maxLength={8}
+                  className="w-full bg-transparent text-lg text-foreground placeholder:text-muted-foreground outline-none px-4 py-2.5 rounded-xl glass focus:ring-1 focus:ring-primary/50 tracking-[0.2em] font-bold"
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={saveCustomCode}
+                    disabled={customCode.length < 4 || changingCode}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl gradient-primary text-primary-foreground text-sm font-bold disabled:opacity-30"
+                  >
+                    {changingCode ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                    Salvar
+                  </button>
+                  <button
+                    onClick={() => { setEditingCode(false); setCustomCode(""); }}
+                    className="px-4 py-2.5 rounded-xl glass text-muted-foreground text-sm font-semibold hover:text-foreground"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl font-black tracking-[0.3em] gradient-text">{friendCode}</span>
+                  <div className="flex gap-1">
+                    <button onClick={copyFriendCode} className="p-2 rounded-xl glass text-muted-foreground hover:text-foreground transition-all" title="Copiar">
+                      <Copy size={16} />
+                    </button>
+                    <button onClick={shareFriendCode} className="p-2 rounded-xl glass text-muted-foreground hover:text-foreground transition-all" title="Compartilhar">
+                      <Share2 size={16} />
+                    </button>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 mt-3">
+                  <button
+                    onClick={() => setEditingCode(true)}
+                    className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-all"
+                  >
+                    <Pencil size={12} /> Personalizar código
+                  </button>
+                  <button
+                    onClick={regenerateCode}
+                    disabled={changingCode}
+                    className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-all"
+                  >
+                    {changingCode ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+                    Gerar novo
+                  </button>
+                </div>
+              </>
+            )}
             <p className="text-[11px] text-muted-foreground mt-2">Compartilhe com amigos para se conectarem</p>
           </div>
         )}

@@ -136,6 +136,7 @@ export type Database = {
           created_at: string | null
           display_name: string | null
           favorite_genres: string[] | null
+          friend_code: string
           id: string
           platforms: string[] | null
           preferred_era: string | null
@@ -149,6 +150,7 @@ export type Database = {
           created_at?: string | null
           display_name?: string | null
           favorite_genres?: string[] | null
+          friend_code?: string
           id?: string
           platforms?: string[] | null
           preferred_era?: string | null
@@ -162,6 +164,7 @@ export type Database = {
           created_at?: string | null
           display_name?: string | null
           favorite_genres?: string[] | null
+          friend_code?: string
           id?: string
           platforms?: string[] | null
           preferred_era?: string | null
@@ -294,7 +297,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      generate_friend_code: { Args: never; Returns: string }
     }
     Enums: {
       [_ in never]: never
