@@ -156,23 +156,21 @@ export default MovieRecommendationCard;
 export function parseMovieRecommendations(content: string): MovieRec[] {
   const movies: MovieRec[] = [];
   
-  // Match patterns like:
-  // **Title (Year)** or *   **Title (Year)** or - **Title (Year)**
-  // With optional emojis before title
-  const regex = /\*\*[🎬🎥🎞️\s]*([^*]+?)\s*(?:\((\d{4})\))?\s*\*\*/g;
+  // ONLY match **Title (Year)** — year is REQUIRED to avoid false positives
+  const regex = /\*\*[🎬🎥🎞️\s]*([^*]+?)\s*\((\d{4})\)\s*\*\*/g;
   let match;
   
   while ((match = regex.exec(content)) !== null) {
     let title = match[1].replace(/[🎬🎥🎞️]/g, "").trim();
     
-    // If title has "/" take only the first part (Portuguese title)
+    // If title has "/" take only the first part
     if (title.includes("/")) {
       title = title.split("/")[0].trim();
     }
     // Remove trailing ":" or "-"
     title = title.replace(/[:\-]$/, "").trim();
     
-    const year = match[2] ? parseInt(match[2]) : undefined;
+    const year = parseInt(match[2]);
     const afterMatch = content.slice(match.index, match.index + 600);
     
     // Extract platforms
@@ -183,7 +181,6 @@ export function parseMovieRecommendations(content: string): MovieRec[] {
 
     // Extract reason: text after the **title** line
     const afterTitle = afterMatch.slice(match[0].length);
-    // Get first meaningful line after title
     const reasonLines = afterTitle.split("\n").map(l => l.replace(/^[\s*\-:]+/, "").trim()).filter(l => l.length > 15 && !l.startsWith("**"));
     const reason = reasonLines[0] || undefined;
 
