@@ -37,10 +37,17 @@ export function usePersonalizedHome() {
   const [isLoading, setIsLoading] = useState(false);
   const [hasPersonalization, setHasPersonalization] = useState(false);
   const inFlightRef = useRef(false);
+  const lastFetchRef = useRef<number>(0);
 
-  const fetchPersonalization = useCallback(async () => {
+  const fetchPersonalization = useCallback(async (force = false) => {
     if (!user || inFlightRef.current) {
       if (!user) setHasPersonalization(false);
+      return;
+    }
+
+    // Throttle: don't re-fetch more than once per 5 minutes unless forced
+    const now = Date.now();
+    if (!force && now - lastFetchRef.current < 5 * 60 * 1000 && hasPersonalization) {
       return;
     }
 
@@ -63,6 +70,8 @@ export function usePersonalizedHome() {
       if (!resp.ok) throw new Error("Personalization failed");
 
       const data: PersonalizedHome = await resp.json();
+      lastFetchRef.current = Date.now();
+
       if (data.sections && data.sections.length > 0) {
         const sections = data.sections.map((section) => ({
           ...section,
@@ -92,41 +101,25 @@ export function usePersonalizedHome() {
       inFlightRef.current = false;
       setIsLoading(false);
     }
-  }, [user]);
+  }, [user, hasPersonalization]);
 
+  // Initial fetch
   useEffect(() => {
     fetchPersonalization();
-  }, [fetchPersonalization]);
+  }, [user]);
 
-  // Retry while personalization is not ready yet (chat extraction is async)
+  // Retry only if no personalization yet (max once per 30s)
   useEffect(() => {
     if (!user || hasPersonalization) return;
-    const interval = setInterval(fetchPersonalization, 20000);
+    const interval = setInterval(() => fetchPersonalization(), 30000);
     return () => clearInterval(interval);
-  }, [user, hasPersonalization, fetchPersonalization]);
-
-  // Refresh when user returns from Chat to Home
-  useEffect(() => {
-    if (!user) return;
-    const onFocus = () => fetchPersonalization();
-    const onVisibilityChange = () => {
-      if (document.visibilityState === "visible") fetchPersonalization();
-    };
-
-    window.addEventListener("focus", onFocus);
-    document.addEventListener("visibilitychange", onVisibilityChange);
-
-    return () => {
-      window.removeEventListener("focus", onFocus);
-      document.removeEventListener("visibilitychange", onVisibilityChange);
-    };
-  }, [user, fetchPersonalization]);
+  }, [user, hasPersonalization]);
 
   return {
     personalizedSections,
     tasteSummary,
     isLoading,
     hasPersonalization,
-    refresh: fetchPersonalization,
+    refresh: () => fetchPersonalization(true),
   };
 }
