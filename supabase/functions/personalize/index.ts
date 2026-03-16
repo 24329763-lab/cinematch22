@@ -170,10 +170,13 @@ serve(async (req) => {
       ? `\nFilmes já assistidos pelo usuário (use para seções "Porque você assistiu X"): ${watchedTitlesList.join(", ")}`
       : "";
 
+    const tasteBioHint = tasteBio ? `\nAUTO-DESCRIÇÃO DO USUÁRIO: "${tasteBio}"` : "";
+
     const prompt = `Você é um motor de recomendação de filmes para home page.
 
 PERFIL REAL DO USUÁRIO (TASTE NOTE):
 ${tasteNote}
+${tasteBioHint}
 
 CONTEXTO:
 - Watchlist: ${watchlistTitles}
