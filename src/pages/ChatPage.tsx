@@ -286,20 +286,19 @@ const ChatPage = () => {
             {isEmpty ? (
               <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col items-center justify-center h-full text-center px-4">
                 <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.1 }}>
-                  <div className="w-16 h-16 rounded-2xl gradient-primary flex items-center justify-center mb-6 mx-auto cinema-glow animate-float">
-                    <Sparkles className="text-primary-foreground" size={28} />
-                  </div>
-                  <h2 className="text-3xl font-black tracking-display mb-3">
-                    <span className="gradient-text">O que vamos assistir?</span>
+                  <h2 className="text-4xl sm:text-5xl font-black tracking-display mb-4 text-foreground">
+                    CineMatch
                   </h2>
-                  <p className="text-sm text-muted-foreground max-w-xs mx-auto leading-relaxed">
-                    Peça recomendações ou me conte o que você curte — vou aprender seu gosto.
+                  <p className="text-sm text-muted-foreground max-w-sm mx-auto leading-relaxed mb-1">
+                    Seu assistente de cinema pessoal.
+                  </p>
+                  <p className="text-xs text-muted-foreground/60 max-w-xs mx-auto">
+                    Peça filmes, descubra novos favoritos, ou me conte o que curte.
                   </p>
                 </motion.div>
-                <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full max-w-lg">
+                <div className="mt-12 flex flex-wrap justify-center gap-2 w-full max-w-lg">
                   {SUGGESTIONS.map((s, i) => (
-                    <motion.button key={s.text} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 + i * 0.08 }} onClick={() => handleSend(s.text)} className="text-left text-sm px-4 py-3.5 rounded-2xl glass text-foreground/80 hover:bg-white/10 transition-all hover:scale-[1.02] flex items-center gap-2">
-                      <s.icon size={14} className="text-primary flex-shrink-0" />
+                    <motion.button key={s.text} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 + i * 0.06 }} onClick={() => handleSend(s.text)} className="text-sm px-4 py-2.5 rounded-full glass text-foreground/60 hover:text-foreground/90 hover:bg-white/10 transition-all">
                       {s.text}
                     </motion.button>
                   ))}

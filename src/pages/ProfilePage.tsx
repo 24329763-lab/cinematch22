@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import { User, Film, Heart, Users, LogOut, Copy, UserPlus, Check, X, Loader2, Sparkles, RefreshCw, Share2, Pencil } from "lucide-react";
+import { User, Film, Heart, Users, LogOut, Copy, UserPlus, Check, X, Loader2, Sparkles, RefreshCw, Share2, Pencil, MessageCircle } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
@@ -35,12 +35,17 @@ const ProfilePage = () => {
   const [changingCode, setChangingCode] = useState(false);
   const [editingCode, setEditingCode] = useState(false);
   const [customCode, setCustomCode] = useState("");
+  const [tasteBio, setTasteBio] = useState("");
+  const [editingBio, setEditingBio] = useState(false);
+  const [savingBio, setSavingBio] = useState(false);
+  const [tasteSummary, setTasteSummary] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
     loadProfile();
     loadFriends();
     loadPendingInvites();
+    loadTasteSummary();
   }, [user]);
 
   const loadProfile = async () => {
@@ -53,12 +58,24 @@ const ProfilePage = () => {
     if (data) {
       setProfile(data);
       setFriendCode((data as any).friend_code || "");
+      setTasteBio((data as any).taste_bio || "");
+    }
+  };
+
+  const loadTasteSummary = async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from("home_recommendations")
+      .select("taste_summary")
+      .eq("user_id", user.id)
+      .single();
+    if (data?.taste_summary) {
+      setTasteSummary(data.taste_summary);
     }
   };
 
   const loadFriends = async () => {
     if (!user) return;
-    // Get accepted invites where user is sender or receiver
     const { data: invites } = await supabase
       .from("friend_invites")
       .select("*")
@@ -124,7 +141,6 @@ const ProfilePage = () => {
     if (!user) return;
     setChangingCode(true);
     try {
-      // Generate a random 6-char code client-side
       const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
       let newCode = "";
       for (let i = 0; i < 6; i++) {
@@ -138,7 +154,6 @@ const ProfilePage = () => {
       
       if (error) {
         if (error.code === "23505") {
-          // Collision - try once more
           let retry = "";
           for (let i = 0; i < 6; i++) retry += chars[Math.floor(Math.random() * chars.length)];
           const { error: e2 } = await supabase.from("profiles").update({ friend_code: retry } as any).eq("user_id", user.id);
@@ -187,21 +202,47 @@ const ProfilePage = () => {
     }
   };
 
+  const saveTasteBio = async () => {
+    if (!user) return;
+    setSavingBio(true);
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ taste_bio: tasteBio } as any)
+        .eq("user_id", user.id);
+      if (error) {
+        toast({ variant: "destructive", title: "Erro ao salvar" });
+      } else {
+        setEditingBio(false);
+        toast({ title: "Perfil de gosto atualizado!" });
+      }
+    } finally {
+      setSavingBio(false);
+    }
+  };
+
   const sendInvite = async () => {
     if (!user || !inviteCode.trim()) return;
     setLoading(true);
     try {
-      // Find profile by friend_code - cast to bypass type check since column was just added
-      const { data: targetProfiles } = await (supabase
+      const codeToSearch = inviteCode.toUpperCase().trim();
+      
+      // Look up profile by friend_code
+      const { data: targetProfiles, error: lookupError } = await supabase
         .from("profiles")
-        .select("user_id, display_name") as any)
-        .eq("friend_code", inviteCode.toUpperCase().trim())
-        .limit(1);
+        .select("user_id, display_name")
+        .eq("friend_code" as any, codeToSearch);
+
+      if (lookupError) {
+        console.error("Lookup error:", lookupError);
+        toast({ variant: "destructive", title: "Erro ao buscar código" });
+        return;
+      }
 
       const targetProfile = (targetProfiles || [])[0] as { user_id: string; display_name: string | null } | undefined;
 
       if (!targetProfile) {
-        toast({ variant: "destructive", title: "Código não encontrado" });
+        toast({ variant: "destructive", title: "Código não encontrado", description: `Nenhum usuário com o código "${codeToSearch}"` });
         return;
       }
 
@@ -210,17 +251,34 @@ const ProfilePage = () => {
         return;
       }
 
+      // Check if invite already exists
+      const { data: existing } = await supabase
+        .from("friend_invites")
+        .select("id, status")
+        .or(`and(sender_id.eq.${user.id},receiver_id.eq.${targetProfile.user_id}),and(sender_id.eq.${targetProfile.user_id},receiver_id.eq.${user.id})`);
+
+      if (existing && existing.length > 0) {
+        const inv = existing[0];
+        if (inv.status === "accepted") {
+          toast({ title: "Vocês já são amigos!" });
+        } else if (inv.status === "pending") {
+          toast({ title: "Convite já enviado!" });
+        } else {
+          // Rejected — allow re-sending
+          await supabase.from("friend_invites").delete().eq("id", inv.id);
+        }
+        if (inv.status !== "rejected") {
+          return;
+        }
+      }
+
       const { error } = await supabase.from("friend_invites").insert({
         sender_id: user.id,
         receiver_id: targetProfile.user_id,
       });
 
       if (error) {
-        if (error.code === "23505") {
-          toast({ title: "Convite já enviado!" });
-        } else {
-          toast({ variant: "destructive", title: "Erro ao enviar convite" });
-        }
+        toast({ variant: "destructive", title: "Erro ao enviar convite" });
         return;
       }
 
@@ -276,6 +334,86 @@ const ProfilePage = () => {
           <p className="text-sm text-muted-foreground mt-1">{user.email}</p>
         </div>
 
+        {/* Taste Profile Card */}
+        <div className="glass-surface rounded-2xl p-5 mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Sparkles size={16} className="text-cinema-gold" />
+              <h3 className="text-sm font-bold">Meu Perfil de Gosto</h3>
+            </div>
+            {!editingBio && (
+              <button onClick={() => setEditingBio(true)} className="p-1.5 rounded-lg glass text-muted-foreground hover:text-foreground transition-all">
+                <Pencil size={12} />
+              </button>
+            )}
+          </div>
+
+          {editingBio ? (
+            <div className="space-y-3">
+              <textarea
+                value={tasteBio}
+                onChange={(e) => setTasteBio(e.target.value)}
+                placeholder="Descreva o que você curte: gêneros, moods, diretores, o que te irrita em filmes... Isso ajuda nas recomendações!"
+                rows={4}
+                maxLength={500}
+                className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none px-4 py-3 rounded-xl glass focus:ring-1 focus:ring-primary/50 resize-none leading-relaxed"
+              />
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-muted-foreground">{tasteBio.length}/500</span>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => { setEditingBio(false); setTasteBio((profile as any)?.taste_bio || ""); }}
+                    className="px-3 py-1.5 rounded-lg glass text-muted-foreground text-xs font-semibold hover:text-foreground"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={saveTasteBio}
+                    disabled={savingBio}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg gradient-primary text-primary-foreground text-xs font-bold disabled:opacity-30"
+                  >
+                    {savingBio ? <Loader2 size={10} className="animate-spin" /> : <Check size={10} />}
+                    Salvar
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div>
+              {tasteBio ? (
+                <p className="text-sm text-foreground/80 leading-relaxed">{tasteBio}</p>
+              ) : tasteSummary ? (
+                <p className="text-sm text-foreground/80 leading-relaxed italic">{tasteSummary}</p>
+              ) : (
+                <button
+                  onClick={() => setEditingBio(true)}
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Toque para descrever seu gosto em filmes — isso melhora suas recomendações ✨
+                </button>
+              )}
+              {tasteBio && (
+                <p className="text-[10px] text-muted-foreground mt-2 flex items-center gap-1">
+                  <MessageCircle size={10} /> Converse no chat para refinar seu perfil
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* AI-generated taste summary */}
+        {tasteSummary && tasteBio && (
+          <div className="glass rounded-2xl p-4 mb-6 flex items-start gap-3">
+            <div className="w-7 h-7 rounded-lg gradient-primary flex items-center justify-center flex-shrink-0">
+              <Sparkles size={12} className="text-primary-foreground" />
+            </div>
+            <div>
+              <span className="text-[10px] font-bold gradient-text uppercase tracking-wider">O que o CineMatch entende</span>
+              <p className="text-xs text-foreground/70 mt-0.5 leading-relaxed">{tasteSummary}</p>
+            </div>
+          </div>
+        )}
+
         {/* Friend code */}
         {friendCode && (
           <div className="glass-surface rounded-2xl p-5 mb-6">
@@ -324,17 +462,10 @@ const ProfilePage = () => {
                   </div>
                 </div>
                 <div className="flex items-center gap-3 mt-3">
-                  <button
-                    onClick={() => setEditingCode(true)}
-                    className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-all"
-                  >
-                    <Pencil size={12} /> Personalizar código
+                  <button onClick={() => setEditingCode(true)} className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-all">
+                    <Pencil size={12} /> Personalizar
                   </button>
-                  <button
-                    onClick={regenerateCode}
-                    disabled={changingCode}
-                    className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-all"
-                  >
+                  <button onClick={regenerateCode} disabled={changingCode} className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-all">
                     {changingCode ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
                     Gerar novo
                   </button>
@@ -356,7 +487,7 @@ const ProfilePage = () => {
               value={inviteCode}
               onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
               placeholder="Código do amigo"
-              maxLength={6}
+              maxLength={8}
               className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none px-4 py-2.5 rounded-xl glass focus:ring-1 focus:ring-primary/50 tracking-[0.2em] font-bold"
             />
             <button
@@ -395,23 +526,6 @@ const ProfilePage = () => {
                     </button>
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Taste summary */}
-        {profile?.favorite_genres && profile.favorite_genres.length > 0 && (
-          <div className="glass-surface rounded-2xl p-5 mb-6">
-            <div className="flex items-center gap-2 mb-3">
-              <Film size={16} className="text-primary" />
-              <h3 className="text-sm font-bold">Seu Gosto</h3>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {profile.favorite_genres.map((g: string) => (
-                <span key={g} className="text-[11px] font-semibold px-3 py-1.5 rounded-full gradient-primary text-primary-foreground">
-                  {g}
-                </span>
               ))}
             </div>
           </div>
