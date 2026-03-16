@@ -1,10 +1,11 @@
 import { NavLink } from "react-router-dom";
-import { MessageSquare, Home, User } from "lucide-react";
+import { MessageSquare, Home, User, Heart } from "lucide-react";
 import { motion } from "framer-motion";
 
 const navItems = [
   { to: "/", icon: Home, label: "Início" },
   { to: "/chat", icon: MessageSquare, label: "Chat" },
+  { to: "/watchlist", icon: Heart, label: "Lista" },
   { to: "/profile", icon: User, label: "Perfil" },
 ];
 
@@ -16,7 +17,7 @@ const BottomNav = () => {
           <NavLink
             key={item.to}
             to={item.to}
-            className="relative flex flex-col items-center gap-1 py-2 px-5"
+            className="relative flex flex-col items-center gap-1 py-2 px-4"
           >
             {({ isActive }) => (
               <>
@@ -31,11 +32,7 @@ const BottomNav = () => {
                   size={20}
                   className={isActive ? "text-primary" : "text-muted-foreground"}
                 />
-                <span
-                  className={`text-[11px] font-medium ${
-                    isActive ? "text-primary" : "text-muted-foreground"
-                  }`}
-                >
+                <span className={`text-[11px] font-medium ${isActive ? "text-primary" : "text-muted-foreground"}`}>
                   {item.label}
                 </span>
               </>
