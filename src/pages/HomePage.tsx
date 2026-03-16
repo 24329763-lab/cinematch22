@@ -61,7 +61,7 @@ const HomePage = () => {
       </div>
 
       {/* Hero Carousel */}
-      <HeroCarousel personalizedSections={personalizedSections} hasPersonalization={hasPersonalization} />
+      <HeroCarousel personalizedSections={personalizedSections} hasPersonalization={hasPersonalization} trendingMovies={TRENDING} />
 
       {/* Personalization loading indicator */}
       {user && personalizationLoading && (
