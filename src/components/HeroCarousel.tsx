@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useTasteCapture } from "@/hooks/useTasteCapture";
+import type { MoviePoster } from "@/lib/tmdb";
 import { MOVIE_BACKDROPS } from "@/lib/tmdb";
 
 interface HeroMovie {
@@ -63,15 +64,50 @@ const DEFAULT_HEROES: HeroMovie[] = [
 ];
 
 const POSTER_BASE = "https://image.tmdb.org/t/p/w780";
+const HERO_SET_SIZE = 4;
+const HERO_ROTATE_MS = 12_000;
+const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
 
-function personalizedToHero(movie: any): HeroMovie {
+function hashSeed(seed: number): number {
+  let h = seed ^ 0x9e3779b9;
+  h ^= h >>> 16;
+  h = Math.imul(h, 0x85ebca6b);
+  h ^= h >>> 13;
+  h = Math.imul(h, 0xc2b2ae35);
+  h ^= h >>> 16;
+  return h >>> 0;
+}
+
+function seededShuffle<T>(arr: T[], seed: number): T[] {
+  const out = [...arr];
+  let state = hashSeed(seed) || 1;
+
+  const rand = () => {
+    state ^= state << 13;
+    state ^= state >>> 17;
+    state ^= state << 5;
+    return (state >>> 0) / 0xffffffff;
+  };
+
+  for (let i = out.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(rand() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
+function getSixHourBucket(): number {
+  return Math.floor(Date.now() / SIX_HOURS_MS);
+}
+
+function movieToHero(movie: any): HeroMovie {
   const posterUrl = movie.posterUrl || (movie.poster_path ? `${POSTER_BASE}${movie.poster_path}` : "/posters/ainda-estou-aqui.jpg");
   return {
-    id: movie.id || movie.title,
+    id: String(movie.id || movie.title),
     title: movie.title,
-    year: movie.year,
-    rating: movie.rating || 8.0,
-    genres: movie.genres || [],
+    year: Number(movie.year || 2024),
+    rating: Number(movie.rating || 8.0),
+    genres: Array.isArray(movie.genres) ? movie.genres : [],
     description: movie.description || "",
     backdropUrl: posterUrl,
     posterUrl,
@@ -82,50 +118,74 @@ function personalizedToHero(movie: any): HeroMovie {
 interface HeroCarouselProps {
   personalizedSections?: any[];
   hasPersonalization: boolean;
+  trendingMovies?: MoviePoster[];
 }
 
-export default function HeroCarousel({ personalizedSections, hasPersonalization }: HeroCarouselProps) {
+export default function HeroCarousel({ personalizedSections, hasPersonalization, trendingMovies = [] }: HeroCarouselProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const { captureWatchlistAdd } = useTasteCapture();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
+  const [sixHourBucket, setSixHourBucket] = useState(getSixHourBucket());
 
-  // Pick heroes: use top matches from personalized sections, fallback to defaults
-  const heroes = useMemo(() => {
-    if (hasPersonalization && personalizedSections && personalizedSections.length > 0) {
-      // Grab top-match movies from different sections (1 per section, up to 4)
-      const picks: HeroMovie[] = [];
-      for (const section of personalizedSections) {
-        if (picks.length >= 4) break;
-        const top = section.movies?.[0];
-        if (top) picks.push(personalizedToHero(top));
-      }
-      return picks.length >= 2 ? picks : DEFAULT_HEROES;
-    }
-    return DEFAULT_HEROES;
-  }, [hasPersonalization, personalizedSections]);
-
-  // Auto-rotate every 5 seconds
+  // keep bucket synced so hero set changes every 6h even without reload
   useEffect(() => {
+    const timer = setInterval(() => {
+      setSixHourBucket((prev) => {
+        const next = getSixHourBucket();
+        return next !== prev ? next : prev;
+      });
+    }, 60_000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const heroPool = useMemo(() => {
+    if (hasPersonalization && personalizedSections && personalizedSections.length > 0) {
+      const flat = personalizedSections.flatMap((section: any) => section.movies || []);
+      const dedup = new Map<string, HeroMovie>();
+      for (const movie of flat) {
+        const key = String(movie.id || movie.title);
+        if (!dedup.has(key)) dedup.set(key, movieToHero(movie));
+      }
+      const personal = Array.from(dedup.values());
+      if (personal.length >= 2) return personal;
+    }
+
+    if (trendingMovies.length > 0) {
+      return trendingMovies.map(movieToHero);
+    }
+
+    return DEFAULT_HEROES;
+  }, [hasPersonalization, personalizedSections, trendingMovies]);
+
+  const heroes = useMemo(() => {
+    if (heroPool.length <= HERO_SET_SIZE) return heroPool;
+    return seededShuffle(heroPool, sixHourBucket).slice(0, HERO_SET_SIZE);
+  }, [heroPool, sixHourBucket]);
+
+  // Auto-rotate every 12 seconds
+  useEffect(() => {
+    if (heroes.length <= 1) return;
     const interval = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % heroes.length);
-    }, 5000);
+    }, HERO_ROTATE_MS);
     return () => clearInterval(interval);
   }, [heroes.length]);
 
-  // Reset index when heroes change
+  // Reset index when hero set changes
   useEffect(() => {
     setCurrentIndex(0);
   }, [heroes]);
 
-  const hero = heroes[currentIndex] || heroes[0];
+  const hero = heroes[currentIndex] || DEFAULT_HEROES[0];
 
   const addToWatchlist = useCallback(async () => {
     if (!user) {
       toast({ variant: "destructive", title: "Faça login para salvar" });
       return;
     }
+
     const slug = hero.id || hero.title.toLowerCase().replace(/[^a-z0-9]+/g, "-");
     const { error } = await supabase.from("watchlist").upsert({
       user_id: user.id,
@@ -137,6 +197,7 @@ export default function HeroCarousel({ personalizedSections, hasPersonalization 
       platforms: hero.platforms || ["netflix"],
       genres: hero.genres,
     }, { onConflict: "user_id,movie_id" });
+
     if (!error) {
       setAddedIds((prev) => new Set(prev).add(hero.id));
       toast({ title: "Adicionado à sua lista!" });
@@ -148,10 +209,7 @@ export default function HeroCarousel({ personalizedSections, hasPersonalization 
 
   return (
     <div className="px-3 pt-3">
-      <div
-        className="relative rounded-3xl overflow-hidden glass-surface-strong"
-        style={{ boxShadow: "0 20px 60px rgba(0,0,0,0.6)" }}
-      >
+      <div className="relative rounded-3xl overflow-hidden glass-surface-strong" style={{ boxShadow: "0 20px 60px rgba(0,0,0,0.6)" }}>
         <div className="relative h-[70vh] min-h-[420px] max-h-[750px]">
           <AnimatePresence mode="wait">
             <motion.img
@@ -165,6 +223,7 @@ export default function HeroCarousel({ personalizedSections, hasPersonalization 
               transition={{ duration: 0.8 }}
             />
           </AnimatePresence>
+
           <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/30 to-transparent" />
           <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-transparent to-transparent" />
 
@@ -174,13 +233,13 @@ export default function HeroCarousel({ personalizedSections, hasPersonalization 
                 <Sparkles size={12} className="text-primary-foreground" />
               </div>
               <span className="text-[11px] font-bold gradient-text uppercase tracking-[0.15em]">
-                {hasPersonalization ? "Escolhido pra Você" : "Recomendação CineMatch"}
+                {hasPersonalization ? "Escolhido pra Você" : "Em Alta no Brasil"}
               </span>
             </div>
 
             <AnimatePresence mode="wait">
               <motion.div
-                key={hero.id + "-text"}
+                key={`${hero.id}-text`}
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -12 }}
@@ -192,7 +251,7 @@ export default function HeroCarousel({ personalizedSections, hasPersonalization 
 
                 <div className="flex items-center gap-3 mb-3 flex-wrap">
                   <span className="flex items-center gap-1 text-sm font-bold text-cinema-gold tabular-nums">
-                    <Star size={14} className="fill-current" /> {hero.rating}
+                    <Star size={14} className="fill-current" /> {hero.rating.toFixed(1)}
                   </span>
                   <span className="text-sm text-muted-foreground tabular-nums">{hero.year}</span>
                   {hero.genres.map((g) => (
@@ -214,15 +273,13 @@ export default function HeroCarousel({ personalizedSections, hasPersonalization 
               </button>
             </div>
 
-            {/* Dot indicators */}
             <div className="flex gap-1.5 mt-5">
               {heroes.map((_, i) => (
                 <button
                   key={i}
                   onClick={() => setCurrentIndex(i)}
-                  className={`h-1 rounded-full transition-all duration-300 ${
-                    i === currentIndex ? "w-6 bg-primary" : "w-1.5 bg-foreground/30"
-                  }`}
+                  className={`h-1 rounded-full transition-all duration-300 ${i === currentIndex ? "w-6 bg-primary" : "w-1.5 bg-foreground/30"}`}
+                  aria-label={`Ir para filme ${i + 1}`}
                 />
               ))}
             </div>
