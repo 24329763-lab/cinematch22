@@ -202,7 +202,10 @@ REGRAS: Sem notas de IMDb/RT. Sem inventar filmes. Sem textão.`;
           }
         }
         await writer.write(encoder.encode("data: [DONE]\n\n"));
-      } catch (e) {
+        // Extract taste signals AFTER streaming completes (runtime still alive)
+        if (shouldExtract) {
+          await extractTasteSignals(messages, userId!, GEMINI_API_KEY);
+        }
         console.error("Stream transform error:", e);
       } finally {
         await writer.close();
