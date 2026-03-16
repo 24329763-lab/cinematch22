@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Sparkles, Heart, Star, Compass, Flame, TrendingUp, Clock, Globe, Loader2, MessageCircle } from "lucide-react";
+import { Sparkles, Heart, Star, Compass, Flame, TrendingUp, Clock, Globe, Loader2, MessageCircle, Users } from "lucide-react";
 import PosterCard from "@/components/PosterCard";
 import MovieDetailModal from "@/components/MovieDetailModal";
 import HorizontalScroll from "@/components/HorizontalScroll";
@@ -63,11 +63,18 @@ const ChatCTA = () => {
   );
 };
 
+interface FriendWatchlist {
+  friendName: string;
+  friendId: string;
+  movies: MoviePoster[];
+}
+
 const HomePage = () => {
   const { user } = useAuth();
   const { personalizedSections, tasteSummary, isLoading: personalizationLoading, hasPersonalization } = usePersonalizedHome();
   const [selectedMovie, setSelectedMovie] = useState<MoviePoster | null>(null);
   const [watchlistItems, setWatchlistItems] = useState<MoviePoster[]>([]);
+  const [friendRows, setFriendRows] = useState<FriendWatchlist[]>([]);
 
   // Fetch watchlist for "Minha Lista" row
   useEffect(() => {
@@ -94,6 +101,59 @@ const HomePage = () => {
           );
         }
       });
+  }, [user]);
+
+  // Fetch friend watchlists
+  useEffect(() => {
+    if (!user) return;
+    const loadFriendRows = async () => {
+      const { data: invites } = await supabase
+        .from("friend_invites")
+        .select("*")
+        .eq("status", "accepted")
+        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`);
+
+      if (!invites || invites.length === 0) return;
+
+      const friendIds = invites.map((i: any) =>
+        i.sender_id === user.id ? i.receiver_id : i.sender_id
+      );
+
+      // Get profiles and watchlists in parallel
+      const [profilesRes, ...watchlistResults] = await Promise.all([
+        supabase.from("profiles").select("user_id, display_name, nickname").in("user_id", friendIds),
+        ...friendIds.map((fid: string) =>
+          supabase.from("watchlist").select("movie_id, title, year, rating, poster_url, platforms, genres").eq("user_id", fid).order("added_at", { ascending: false }).limit(15)
+        ),
+      ]);
+
+      const profiles = profilesRes.data || [];
+      const rows: FriendWatchlist[] = [];
+
+      friendIds.forEach((fid: string, idx: number) => {
+        const profile = profiles.find((p: any) => p.user_id === fid);
+        const items = (watchlistResults[idx] as any)?.data || [];
+        if (items.length > 0) {
+          rows.push({
+            friendId: fid,
+            friendName: (profile as any)?.nickname || (profile as any)?.display_name || "Amigo",
+            movies: items.map((item: any) => ({
+              id: item.movie_id,
+              title: item.title,
+              year: item.year || 2024,
+              rating: item.rating || 7.5,
+              posterUrl: item.poster_url || "/placeholder.svg",
+              platforms: (item.platforms || []) as ("netflix" | "prime" | "disney")[],
+              genres: item.genres || [],
+              description: "",
+            })),
+          });
+        }
+      });
+
+      setFriendRows(rows);
+    };
+    loadFriendRows();
   }, [user]);
 
   return (
@@ -155,6 +215,18 @@ const HomePage = () => {
           </section>
         );
       })}
+
+      {/* Friend rows */}
+      {friendRows.map((fr) => (
+        <section key={fr.friendId} className="mt-10">
+          <SectionHeader icon={Users} title={`Favoritos de ${fr.friendName}`} subtitle="Da lista do seu amigo" />
+          <HorizontalScroll>
+            {fr.movies.map((movie, i) => (
+              <PosterCard key={movie.id} movie={movie} index={i} onSelect={setSelectedMovie} />
+            ))}
+          </HorizontalScroll>
+        </section>
+      ))}
 
       {/* Chat CTA when not enough personalized content */}
       {user && !personalizationLoading && (!hasPersonalization || personalizedSections.length < 3) && (
