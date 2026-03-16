@@ -1,6 +1,6 @@
-import { motion } from "framer-motion";
-import { Star, Plus, Check, ExternalLink } from "lucide-react";
 import { useState } from "react";
+import { motion } from "framer-motion";
+import { Star, Plus, Check, ExternalLink, Play } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -27,7 +27,8 @@ const MovieRecommendationCard = ({ movie, index = 0 }: { movie: MovieRec; index?
   const slug = slugify(movie.title);
   const posterUrl = MOVIE_POSTERS[slug] || "/placeholder.svg";
 
-  const addToWatchlist = async () => {
+  const addToWatchlist = async (e: React.MouseEvent) => {
+    e.stopPropagation();
     if (!user) {
       toast({ variant: "destructive", title: "Faça login para salvar" });
       return;
@@ -48,7 +49,8 @@ const MovieRecommendationCard = ({ movie, index = 0 }: { movie: MovieRec; index?
     }
   };
 
-  const shareMovie = () => {
+  const shareMovie = (e: React.MouseEvent) => {
+    e.stopPropagation();
     const url = `${window.location.origin}/movie/${slug}`;
     navigator.clipboard.writeText(url);
     toast({ title: "Link copiado!" });
@@ -56,52 +58,75 @@ const MovieRecommendationCard = ({ movie, index = 0 }: { movie: MovieRec; index?
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.1 }}
-      className="glass-surface rounded-2xl overflow-hidden flex gap-0 max-w-md"
+      initial={{ opacity: 0, scale: 0.92 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ delay: index * 0.08 }}
+      className="flex-shrink-0 w-[180px] sm:w-[200px] flex flex-col gap-2"
     >
-      {/* Poster */}
-      <div className="w-28 h-40 flex-shrink-0">
-        <img src={posterUrl} alt={movie.title} className="w-full h-full object-cover" />
+      {/* Poster - same style as main page cards */}
+      <div
+        className="relative w-full aspect-[2/3] rounded-2xl overflow-hidden cursor-pointer group/rec"
+        style={{ boxShadow: "0 8px 30px rgba(0,0,0,0.5)" }}
+      >
+        <img src={posterUrl} alt={movie.title} className="w-full h-full object-cover transition-transform duration-500 group-hover/rec:scale-110" />
+
+        {/* Platform badges */}
+        {movie.platforms && movie.platforms.length > 0 && (
+          <div className="absolute top-2 right-2 flex gap-1">
+            {movie.platforms.map((p) => (
+              <span key={p} className="bg-background/80 text-foreground text-[9px] font-bold px-1.5 py-0.5 rounded-md backdrop-blur-sm">
+                {p}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Bottom gradient */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+
+        {/* Info overlay */}
+        <div className="absolute bottom-0 left-0 right-0 p-3">
+          <h4 className="text-sm font-bold leading-tight line-clamp-2 text-foreground drop-shadow-lg">
+            {movie.title}
+          </h4>
+          <div className="flex items-center gap-1.5 mt-1">
+            {movie.rating && (
+              <>
+                <Star size={11} className="text-cinema-gold fill-cinema-gold" />
+                <span className="text-[11px] font-semibold tabular-nums text-cinema-gold">{movie.rating}</span>
+              </>
+            )}
+            {movie.year && <span className="text-[11px] text-foreground/60 tabular-nums">{movie.year}</span>}
+          </div>
+        </div>
+
+        {/* Hover actions */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 opacity-0 group-hover/rec:opacity-100 transition-opacity duration-300">
+          <div className="w-10 h-10 rounded-full gradient-primary flex items-center justify-center cinema-glow-sm">
+            <Play size={16} className="text-primary-foreground ml-0.5" fill="currentColor" />
+          </div>
+          <div className="flex gap-2">
+            <button onClick={addToWatchlist} className="p-1.5 rounded-full glass text-foreground hover:bg-white/20 transition-all">
+              {added ? <Check size={12} /> : <Plus size={12} />}
+            </button>
+            <button onClick={shareMovie} className="p-1.5 rounded-full glass text-foreground hover:bg-white/20 transition-all">
+              <ExternalLink size={12} />
+            </button>
+          </div>
+        </div>
       </div>
 
-      {/* Info */}
-      <div className="flex-1 p-3 flex flex-col justify-between min-w-0">
-        <div>
-          <h4 className="text-sm font-bold text-foreground leading-tight line-clamp-1">{movie.title}</h4>
-          <div className="flex items-center gap-2 mt-1">
-            {movie.rating && (
-              <span className="flex items-center gap-0.5 text-xs font-semibold text-cinema-gold">
-                <Star size={10} className="fill-current" /> {movie.rating}
-              </span>
-            )}
-            {movie.year && <span className="text-xs text-muted-foreground">{movie.year}</span>}
-          </div>
-          {movie.platforms && movie.platforms.length > 0 && (
-            <div className="flex gap-1 mt-1.5">
-              {movie.platforms.map((p) => (
-                <span key={p} className="text-[9px] font-bold px-1.5 py-0.5 rounded glass text-foreground/70">{p}</span>
-              ))}
-            </div>
-          )}
-          {movie.reason && (
-            <p className="text-xs text-muted-foreground mt-2 line-clamp-2 leading-relaxed">{movie.reason}</p>
-          )}
-        </div>
-        <div className="flex items-center gap-2 mt-2">
-          <button
-            onClick={addToWatchlist}
-            className={`flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-xl transition-all ${added ? "gradient-primary text-primary-foreground" : "glass text-foreground/70 hover:bg-white/10"}`}
-          >
-            {added ? <Check size={12} /> : <Plus size={12} />}
-            {added ? "Salvo" : "Lista"}
-          </button>
-          <button onClick={shareMovie} className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-xl glass text-foreground/70 hover:bg-white/10">
-            <ExternalLink size={12} /> Link
-          </button>
-        </div>
-      </div>
+      {/* Description underneath the card */}
+      {movie.reason && (
+        <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3 px-1">
+          {movie.reason}
+        </p>
+      )}
+      {movie.description && !movie.reason && (
+        <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3 px-1">
+          {movie.description}
+        </p>
+      )}
     </motion.div>
   );
 };
@@ -111,24 +136,22 @@ export default MovieRecommendationCard;
 // Parse AI response for movie recommendations
 export function parseMovieRecommendations(content: string): MovieRec[] {
   const movies: MovieRec[] = [];
-  // Match patterns like **Title (Year)** or **🎬 Title (Year)**
   const regex = /\*\*[🎬🎥🎞️]*\s*(.+?)\s*(?:\((\d{4})\))?\s*\*\*/g;
   let match;
   while ((match = regex.exec(content)) !== null) {
     const title = match[1].replace(/[🎬🎥🎞️]/g, "").trim();
     const year = match[2] ? parseInt(match[2]) : undefined;
-    // Try to extract rating
-    const afterMatch = content.slice(match.index, match.index + 300);
+    const afterMatch = content.slice(match.index, match.index + 500);
     const ratingMatch = afterMatch.match(/⭐\s*([\d.]+)|IMDb[:\s]*([\d.]+)|nota[:\s]*([\d.]+)/i);
     const rating = ratingMatch ? parseFloat(ratingMatch[1] || ratingMatch[2] || ratingMatch[3] || "0") : undefined;
-    // Extract platforms
     const platforms: string[] = [];
     if (/netflix/i.test(afterMatch)) platforms.push("Netflix");
     if (/prime/i.test(afterMatch)) platforms.push("Prime");
     if (/disney/i.test(afterMatch)) platforms.push("Disney+");
-    // Extract reason - text after the title line
-    const reasonMatch = afterMatch.match(/(?:\n|—|:)\s*(.{20,150}?)(?:\n|$)/);
-    const reason = reasonMatch ? reasonMatch[1].replace(/\*\*/g, "").trim() : undefined;
+
+    // Extract description/reason - look for text after the bold title
+    const reasonMatch = afterMatch.match(/(?:\n|—|:)\s*(.{20,200}?)(?:\n\n|\n-|\n\*|$)/);
+    const reason = reasonMatch ? reasonMatch[1].replace(/\*\*/g, "").replace(/^[\s-:]+/, "").trim() : undefined;
 
     if (title.length > 1 && title.length < 80) {
       movies.push({ title, year, rating, platforms, reason });

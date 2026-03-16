@@ -56,7 +56,6 @@ const MovieDetailModal = ({ movie, onClose }: MovieDetailModalProps) => {
     toast({ title: "Link copiado!" });
   };
 
-  // Simple taste-based reason (could be enhanced with AI later)
   const getWhyYouLike = () => {
     if (!user) return null;
     const genreReasons: Record<string, string> = {
@@ -80,15 +79,17 @@ const MovieDetailModal = ({ movie, onClose }: MovieDetailModalProps) => {
 
   return (
     <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
+      <div
         className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-8"
         onClick={onClose}
       >
         {/* Backdrop */}
-        <div className="absolute inset-0 bg-background/80 backdrop-blur-xl" />
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="absolute inset-0 bg-background/80 backdrop-blur-xl"
+        />
 
         {/* Modal */}
         <motion.div
@@ -118,7 +119,7 @@ const MovieDetailModal = ({ movie, onClose }: MovieDetailModalProps) => {
             </div>
 
             {/* Content */}
-            <div className="flex-1 p-6 sm:p-8 flex flex-col justify-between">
+            <div className="flex-1 p-6 sm:p-8 flex flex-col justify-between overflow-y-auto max-h-[50vh] sm:max-h-[85vh]">
               <div>
                 <h2 className="text-2xl sm:text-3xl font-black tracking-display text-foreground mb-2">
                   {movie.title}
@@ -159,11 +160,13 @@ const MovieDetailModal = ({ movie, onClose }: MovieDetailModalProps) => {
                   </div>
                 )}
 
-                {/* Why you'd like it */}
+                {/* Why you'd like it - after description */}
                 {whyReason && (
-                  <p className="text-sm italic text-primary/80 mb-4">
-                    💡 {whyReason}
-                  </p>
+                  <div className="border-l-2 border-primary pl-3 mb-4">
+                    <p className="text-sm italic text-primary/80">
+                      💡 {whyReason}
+                    </p>
+                  </div>
                 )}
               </div>
 
@@ -189,7 +192,7 @@ const MovieDetailModal = ({ movie, onClose }: MovieDetailModalProps) => {
             </div>
           </div>
         </motion.div>
-      </motion.div>
+      </div>
     </AnimatePresence>
   );
 };
