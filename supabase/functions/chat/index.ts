@@ -7,26 +7,30 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse";
+
+function toGeminiMessages(messages: { role: string; content: string }[]) {
+  return messages.map(m => ({
+    role: m.role === "assistant" ? "model" : "user",
+    parts: [{ text: m.content }],
+  }));
+}
+
 async function extractTasteSignals(messages: { role: string; content: string }[], userId: string, apiKey: string) {
   try {
-    // Only analyze if there are at least 2 messages (user + assistant)
     if (messages.length < 2) return;
-
-    // Take last 6 messages for context
     const recentMessages = messages.slice(-6);
     const conversation = recentMessages.map(m => `${m.role}: ${m.content}`).join("\n");
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [{
-          role: "user",
-          content: `Analise esta conversa sobre filmes e extraia sinais de gosto do USUÁRIO (não do assistente).
+    const resp = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{
+              text: `Analise esta conversa sobre filmes e extraia sinais de gosto do USUÁRIO (não do assistente).
 
 CONVERSA:
 ${conversation}
@@ -51,23 +55,21 @@ Responda APENAS em JSON válido:
 }
 
 Se não houver sinais claros, retorne {"signals": []}`,
-        }],
-        max_tokens: 500,
-        temperature: 0.3,
-        response_format: { type: "json_object" },
-      }),
-    });
+            }],
+          }],
+          generationConfig: { temperature: 0.3, maxOutputTokens: 500, responseMimeType: "application/json" },
+        }),
+      }
+    );
 
-    if (!response.ok) return;
+    if (!resp.ok) return;
+    const data = await resp.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!text) return;
 
-    const data = await response.json();
-    const content = data.choices?.[0]?.message?.content;
-    if (!content) return;
-
-    const { signals } = JSON.parse(content);
+    const { signals } = JSON.parse(text);
     if (!signals || signals.length === 0) return;
 
-    // Save signals using service role
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const serviceClient = createClient(supabaseUrl, serviceKey);
@@ -94,8 +96,8 @@ serve(async (req) => {
 
   try {
     const { messages } = await req.json();
-    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
-    if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY is not configured");
+    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+    if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY is not configured");
 
     // Try to get user ID for taste extraction
     let userId: string | null = null;
@@ -112,20 +114,7 @@ serve(async (req) => {
       } catch { /* ignore */ }
     }
 
-    const response = await fetch(
-      "https://api.openai.com/v1/chat/completions",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${OPENAI_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "gpt-4o",
-          messages: [
-            {
-              role: "system",
-              content: `Você é o CineMatch — conciso, esperto, cinéfilo. Português brasileiro sempre.
+    const systemInstruction = `Você é o CineMatch — conciso, esperto, cinéfilo. Português brasileiro sempre.
 
 Seja direto. Nada de introduções longas ou explicações óbvias. Fale como um amigo que manja de cinema, não como um robô.
 
@@ -141,40 +130,88 @@ CONVERSA: Quando quiserem falar sobre gosto:
 - Pergunte o que a pessoa SENTIU, não só o que assistiu
 - Conecte padrões ("você curte protagonistas obsessivos, né?")
 
-REGRAS: Sem notas de IMDb/RT. Sem inventar filmes. Sem textão.`,
-            },
-            ...messages,
-          ],
-          stream: true,
-          max_tokens: 4096,
-        }),
-      }
-    );
+REGRAS: Sem notas de IMDb/RT. Sem inventar filmes. Sem textão.`;
+
+    const geminiMessages = toGeminiMessages(messages);
+
+    const response = await fetch(`${GEMINI_URL}&key=${GEMINI_API_KEY}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: systemInstruction }] },
+        contents: geminiMessages,
+        generationConfig: { temperature: 0.9, maxOutputTokens: 4096 },
+      }),
+    });
 
     if (!response.ok) {
+      const t = await response.text();
+      console.error("Gemini error:", response.status, t);
       if (response.status === 429) {
         return new Response(
           JSON.stringify({ error: "Rate limit exceeded. Tente novamente em alguns segundos." }),
           { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      const t = await response.text();
-      console.error("OpenAI error:", response.status, t);
       return new Response(
         JSON.stringify({ error: "Erro no serviço de IA" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Fire taste extraction in the background (non-blocking)
+    // Fire taste extraction in the background
     if (userId && messages.length >= 2) {
-      // We extract from the messages sent (which include user's latest message)
-      // The assistant response isn't available yet since we're streaming, 
-      // but we can still analyze what the user has said
-      extractTasteSignals(messages, userId, OPENAI_API_KEY).catch(() => {});
+      extractTasteSignals(messages, userId, GEMINI_API_KEY).catch(() => {});
     }
 
-    return new Response(response.body, {
+    // Transform Gemini SSE stream to OpenAI-compatible SSE stream
+    const { readable, writable } = new TransformStream();
+    const writer = writable.getWriter();
+    const encoder = new TextEncoder();
+
+    (async () => {
+      try {
+        const reader = response.body!.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+
+          let newlineIdx: number;
+          while ((newlineIdx = buffer.indexOf("\n")) !== -1) {
+            let line = buffer.slice(0, newlineIdx);
+            buffer = buffer.slice(newlineIdx + 1);
+            if (line.endsWith("\r")) line = line.slice(0, -1);
+            if (!line.startsWith("data: ")) continue;
+
+            const jsonStr = line.slice(6).trim();
+            if (!jsonStr || jsonStr === "[DONE]") continue;
+
+            try {
+              const parsed = JSON.parse(jsonStr);
+              const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
+              if (text) {
+                // Convert to OpenAI-compatible format
+                const openAIChunk = {
+                  choices: [{ delta: { content: text }, index: 0 }],
+                };
+                await writer.write(encoder.encode(`data: ${JSON.stringify(openAIChunk)}\n\n`));
+              }
+            } catch { /* skip malformed */ }
+          }
+        }
+        await writer.write(encoder.encode("data: [DONE]\n\n"));
+      } catch (e) {
+        console.error("Stream transform error:", e);
+      } finally {
+        await writer.close();
+      }
+    })();
+
+    return new Response(readable, {
       headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
     });
   } catch (e) {

@@ -18,8 +18,8 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
-    if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY not configured");
+    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+    if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY not configured");
 
     // Get user from token
     const userClient = createClient(supabaseUrl, anonKey, {
@@ -45,19 +45,13 @@ serve(async (req) => {
       .eq("user_id", user.id)
       .single();
 
-    // If we have cached recs and signal count hasn't changed much, return cached
     const signalCount = signals?.length || 0;
-    if (
-      existingRecs &&
-      existingRecs.signals_count === signalCount &&
-      signalCount > 0
-    ) {
+    if (existingRecs && existingRecs.signals_count === signalCount && signalCount > 0) {
       return new Response(JSON.stringify(existingRecs), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // No signals yet — return empty (frontend will show defaults)
     if (!signals || signals.length === 0) {
       return new Response(JSON.stringify({ sections: [], taste_summary: null }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -66,19 +60,14 @@ serve(async (req) => {
 
     // Get user's profile for extra context
     const { data: profile } = await serviceClient
-      .from("profiles")
-      .select("*")
-      .eq("user_id", user.id)
-      .single();
+      .from("profiles").select("*").eq("user_id", user.id).single();
 
-    // Get watchlist and watched for context
     const [{ data: watchlist }, { data: watched }] = await Promise.all([
       serviceClient.from("watchlist").select("title, genres, year, rating").eq("user_id", user.id).limit(50),
       serviceClient.from("watched").select("title, genres, year, user_rating").eq("user_id", user.id).limit(50),
     ]);
 
-    // Build signal summary for GPT
-    const signalSummary = signals.map(s => 
+    const signalSummary = signals.map(s =>
       `${s.signal_type}: ${s.category}="${s.value}" (confiança: ${s.confidence}, fonte: ${s.source})`
     ).join("\n");
 
@@ -146,29 +135,26 @@ Responda APENAS em JSON válido:
   ]
 }`;
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "gpt-4o",
-        messages: [{ role: "user", content: prompt }],
-        max_tokens: 4096,
-        temperature: 0.8,
-        response_format: { type: "json_object" },
-      }),
-    });
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.8, maxOutputTokens: 4096, responseMimeType: "application/json" },
+        }),
+      }
+    );
 
     if (!response.ok) {
       const t = await response.text();
-      console.error("OpenAI error:", response.status, t);
+      console.error("Gemini error:", response.status, t);
       throw new Error("AI service error");
     }
 
     const data = await response.json();
-    const content = data.choices?.[0]?.message?.content;
+    const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!content) throw new Error("No AI response");
 
     const result = JSON.parse(content);
