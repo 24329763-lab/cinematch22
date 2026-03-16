@@ -120,7 +120,7 @@ interface HeroCarouselProps {
   hasPersonalization: boolean;
 }
 
-export default function HeroCarousel({ personalizedSections, hasPersonalization, trendingMovies = [] }: HeroCarouselProps) {
+export default function HeroCarousel({ personalizedSections, hasPersonalization }: HeroCarouselProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const { captureWatchlistAdd } = useTasteCapture();
