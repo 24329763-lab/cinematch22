@@ -155,9 +155,15 @@
 
   /* Responsive poster card sizing */
   .poster-card {
-    /* Mobile: ~4.5 visible per row */
-    width: calc((100vw - 40px - 4 * 20px) / 4.5);
-    aspect-ratio: 2/3;
+    /* Mobile: bigger cards, ~2.5 visible */
+    width: 150px;
+    height: 225px;
+  }
+  @media (min-width: 640px) {
+    .poster-card {
+      width: 200px;
+      height: 300px;
+    }
   }
   @media (min-width: 768px) {
     .poster-card {
