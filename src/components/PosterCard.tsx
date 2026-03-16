@@ -31,6 +31,7 @@ const PosterCard = ({
   const [added, setAdded] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
+  const { captureWatchlistAdd } = useTasteCapture();
 
   const slug = slugify(movie.title);
 
