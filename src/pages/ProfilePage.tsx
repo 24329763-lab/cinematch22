@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import { User, Film, Heart, Users, LogOut, Copy, UserPlus, Check, X, Loader2, Sparkles } from "lucide-react";
+import { User, Film, Heart, Users, LogOut, Copy, UserPlus, Check, X, Loader2, Sparkles, RefreshCw, Share2, Pencil } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
