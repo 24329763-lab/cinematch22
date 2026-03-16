@@ -87,7 +87,14 @@ const ChatPage = () => {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [activeConvId, setActiveConvId] = useState<string | null>(null);
+  const [activeConvId, setActiveConvIdRaw] = useState<string | null>(() => {
+    return sessionStorage.getItem("activeConvId") || null;
+  });
+  const setActiveConvId = (id: string | null) => {
+    setActiveConvIdRaw(id);
+    if (id) sessionStorage.setItem("activeConvId", id);
+    else sessionStorage.removeItem("activeConvId");
+  };
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [selectedMovie, setSelectedMovie] = useState<MoviePoster | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);

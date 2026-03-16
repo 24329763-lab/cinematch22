@@ -79,7 +79,12 @@ serve(async (req) => {
       .eq("user_id", user.id)
       .single();
 
-    if (existingRecs && existingRecs.signals_count === profileVersion && profileVersion > 0) {
+    const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
+    const isFresh = existingRecs?.generated_at
+      ? Date.now() - new Date(existingRecs.generated_at).getTime() < SIX_HOURS_MS
+      : false;
+
+    if (existingRecs && existingRecs.signals_count === profileVersion && profileVersion > 0 && isFresh) {
       return new Response(JSON.stringify(existingRecs), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
