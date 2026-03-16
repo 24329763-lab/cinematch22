@@ -206,6 +206,7 @@ REGRAS: Sem notas de IMDb/RT. Sem inventar filmes. Sem textão.`;
         if (shouldExtract) {
           await extractTasteSignals(messages, userId!, GEMINI_API_KEY);
         }
+      } catch (e) {
         console.error("Stream transform error:", e);
       } finally {
         await writer.close();
