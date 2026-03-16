@@ -30,7 +30,7 @@ async function extractTasteSignals(messages: { role: string; content: string }[]
         body: JSON.stringify({
           contents: [{
             parts: [{
-              text: `Analise esta conversa sobre filmes e extraia sinais de gosto do USUÁRIO (não do assistente).
+               text: `Analise esta conversa sobre filmes e extraia sinais de gosto do USUÁRIO (não do assistente).
 
 CONVERSA:
 ${conversation}
@@ -42,15 +42,21 @@ Tipos de sinal:
 - "dislike" = não gosta de algo  
 - "preference" = prefere um estilo/tipo
 - "interest" = demonstrou interesse
-- "avoid" = quer evitar
+- "avoid" = quer evitar / não suporta
 
-Categorias: genre, movie, mood, era, director, actor, theme, style, pace, origin
+Categorias:
+- genre, movie, mood, era, director, actor, theme, style, pace, origin
+- element (cachorros, gatos, trens, carros, etc)
+- setting (guerra, espaço, floresta, cidade, etc)
+- topic (política, filosofia, romance, etc)
+
+IMPORTANTE: Capture TUDO que a pessoa mencionar gostar ou não gostar, incluindo coisas não-cinematográficas como animais, objetos, cenários específicos, personagens arquetípicos, temas que a pessoa odeia.
 
 Responda APENAS em JSON válido:
 {
   "signals": [
     {"signal_type": "like", "category": "genre", "value": "terror psicológico", "confidence": 0.9},
-    {"signal_type": "preference", "category": "mood", "value": "tenso", "confidence": 0.8}
+    {"signal_type": "avoid", "category": "element", "value": "violência com animais", "confidence": 0.95}
   ]
 }
 

@@ -24,6 +24,8 @@ type ChatTasteExtraction = {
   signals: TasteSignal[];
 };
 
+const TMDB_POSTER_BASE = "https://image.tmdb.org/t/p/w500";
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -37,6 +39,7 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+    const TMDB_API_KEY = Deno.env.get("TMDB_API_KEY");
     if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY not configured");
 
     const userClient = createClient(supabaseUrl, anonKey, {
@@ -89,13 +92,11 @@ serve(async (req) => {
       tasteNote = buildTasteNoteFromSignals(signalRows);
     }
 
-    // Fallback: derive taste note from chat history when taste_signals is empty
     if (!tasteNote && userMessages.length > 0) {
       const extracted = await extractTasteFromChat(userMessages, GEMINI_API_KEY);
       tasteNote = extracted.taste_note;
       tasteSignals = extracted.signals?.length ? extracted.signals : tasteSignals;
 
-      // Optional backfill so future requests are cheaper
       if (signalRows.length === 0 && extracted.signals?.length) {
         const uniqueSignals = dedupeSignals(extracted.signals);
         if (uniqueSignals.length > 0) {
@@ -113,7 +114,6 @@ serve(async (req) => {
       }
     }
 
-    // Last fallback from explicit user lists
     if (!tasteNote) {
       const watchedSummary = watched
         ?.map((w) => `${w.title}${w.user_rating ? ` (${w.user_rating}★)` : ""}`)
@@ -146,14 +146,15 @@ CONTEXTO:
 - Já assistidos: ${watchedTitles}
 - Plataformas: ${profile?.platforms?.join(", ") || "Netflix, Prime Video, Disney+"}
 
-TAREFA: Gere 3 seções personalizadas, cada uma com 4 filmes REAIS.
-- Títulos refletem o gosto do usuário
+TAREFA: Gere 3 seções personalizadas, cada uma com **8 filmes REAIS**.
+- Títulos das seções refletem o gosto do usuário
 - NÃO repetir filmes entre seções
 - NÃO incluir filmes já assistidos
 - matchPercent: 55-98 baseado no taste note real
+- Cada filme DEVE ter o campo "tmdb_title" com o título original/internacional para busca no TMDB
 
 JSON OBRIGATÓRIO (sem texto extra):
-{"taste_summary":"...","sections":[{"key":"s1","title":"...","subtitle":"...","icon":"heart","movies":[{"id":"slug","title":"...","year":2024,"rating":8.1,"genres":["Drama"],"platforms":["netflix"],"description":"curta","matchPercent":84}]}]}`;
+{"taste_summary":"...","sections":[{"key":"s1","title":"...","subtitle":"...","icon":"heart","movies":[{"id":"slug","title":"...","tmdb_title":"...","year":2024,"rating":8.1,"genres":["Drama"],"platforms":["netflix"],"description":"uma frase curta","matchPercent":84}]}]}`;
 
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
@@ -185,10 +186,16 @@ JSON OBRIGATÓRIO (sem texto extra):
     try {
       result = JSON.parse(content);
     } catch {
-      // Try to repair truncated JSON
       const repaired = repairJson(content);
       result = JSON.parse(repaired);
     }
+
+    // Fetch TMDB posters for all movies
+    const allMovies = (result.sections || []).flatMap((s: any) => s.movies || []);
+    if (TMDB_API_KEY && allMovies.length > 0) {
+      await enrichWithTmdbPosters(allMovies, TMDB_API_KEY);
+    }
+
     const normalizedSections = normalizeSections(result.sections || [], tasteNote, tasteSignals);
 
     const finalPayload = {
@@ -218,6 +225,35 @@ JSON OBRIGATÓRIO (sem texto extra):
     );
   }
 });
+
+async function enrichWithTmdbPosters(movies: any[], tmdbApiKey: string) {
+  // Batch search - process 4 at a time to avoid rate limits
+  const batchSize = 4;
+  for (let i = 0; i < movies.length; i += batchSize) {
+    const batch = movies.slice(i, i + batchSize);
+    await Promise.all(
+      batch.map(async (movie: any) => {
+        try {
+          const searchTitle = movie.tmdb_title || movie.title;
+          const year = movie.year ? `&year=${movie.year}` : "";
+          const url = `https://api.themoviedb.org/3/search/movie?api_key=${tmdbApiKey}&query=${encodeURIComponent(searchTitle)}${year}&language=pt-BR`;
+          const resp = await fetch(url);
+          if (!resp.ok) return;
+          const data = await resp.json();
+          const first = data.results?.[0];
+          if (first?.poster_path) {
+            movie.posterUrl = `${TMDB_POSTER_BASE}${first.poster_path}`;
+          }
+          if (first?.overview && !movie.description) {
+            movie.description = first.overview.slice(0, 200);
+          }
+        } catch {
+          // Skip failed lookups
+        }
+      }),
+    );
+  }
+}
 
 async function fetchRecentUserMessages(serviceClient: ReturnType<typeof createClient>, userId: string): Promise<string[]> {
   const { data: conversations } = await serviceClient
@@ -256,24 +292,26 @@ async function extractTasteFromChat(userMessages: string[], apiKey: string): Pro
           {
             parts: [
               {
-                text: `Analise as mensagens do usuário sobre cinema e extraia um perfil de gosto objetivo.
+                text: `Analise as mensagens do usuário sobre cinema e extraia um perfil de gosto completo.
 
 MENSAGENS DO USUÁRIO:
 ${conversation}
 
 Responda APENAS em JSON:
 {
-  "taste_note": "Texto curto com perfil de gosto em formato de nota",
+  "taste_note": "Texto curto com perfil de gosto completo incluindo temas, elementos visuais e não-cinematográficos que a pessoa gosta ou não gosta",
   "likes": ["..."],
   "dislikes": ["..."],
   "preferences": ["..."],
   "signals": [
-    {"signal_type":"like|dislike|preference|interest|avoid","category":"genre|movie|mood|era|director|actor|theme|style|origin","value":"...","confidence":0.0}
+    {"signal_type":"like|dislike|preference|interest|avoid","category":"genre|movie|mood|era|director|actor|theme|style|origin|element|animal|setting|topic","value":"...","confidence":0.0}
   ]
 }
 
 Regras:
-- Só usar sinais explícitos
+- Só usar sinais explícitos do que o usuário disse
+- Inclua QUALQUER preferência mencionada: animais (cachorros, gatos), temas (guerra, espaço), elementos visuais, cenários, coisas que a pessoa odeia ou não suporta
+- Use "avoid" para coisas que a pessoa disse que não gosta/não quer ver
 - Se faltar info, arrays vazios
 - Nunca inventar preferências não mencionadas`,
               },
@@ -282,7 +320,7 @@ Regras:
         ],
         generationConfig: {
           temperature: 0.2,
-          maxOutputTokens: 900,
+          maxOutputTokens: 1200,
           responseMimeType: "application/json",
         },
       }),
@@ -331,7 +369,7 @@ function buildTasteNoteFromSignals(signals: TasteSignal[]): string {
   for (const [category, data] of Object.entries(groups)) {
     const parts: string[] = [];
     if (data.likes.length) parts.push(`gosta: ${data.likes.join(", ")}`);
-    if (data.dislikes.length) parts.push(`não gosta: ${data.dislikes.join(", ")}`);
+    if (data.dislikes.length) parts.push(`NÃO gosta: ${data.dislikes.join(", ")}`);
     if (data.preferences.length) parts.push(`prefere: ${data.preferences.join(", ")}`);
     if (parts.length) lines.push(`[${category.toUpperCase()}] ${parts.join(" | ")}`);
   }
@@ -362,7 +400,6 @@ function normalizeSections(sections: any[], tasteNote: string, signals: TasteSig
     if (s.signal_type === "preference") preferred.add(v);
   }
 
-  // enrich from taste note keywords
   const words = tokenize(tasteNote).filter((w) => w.length > 3);
   for (const w of words.slice(0, 25)) preferred.add(w);
 
@@ -381,6 +418,7 @@ function normalizeSections(sections: any[], tasteNote: string, signals: TasteSig
         genres: Array.isArray(movie.genres) ? movie.genres : [],
         platforms: Array.isArray(movie.platforms) ? movie.platforms : ["netflix"],
         description: movie.description || "",
+        posterUrl: movie.posterUrl || "",
         matchPercent: computed,
       };
     }),
@@ -454,8 +492,6 @@ function deterministicJitter(seed: string, modulo: number): number {
 
 function repairJson(text: string): string {
   let s = text.trim();
-  // Remove trailing incomplete strings/values
-  // Close open brackets/braces
   const opens = { "{": "}", "[": "]" };
   const closes = new Set(["}", "]"]);
   const stack: string[] = [];
@@ -472,13 +508,8 @@ function repairJson(text: string): string {
     else if (closes.has(ch)) stack.pop();
   }
 
-  // If inside a string, close it
   if (inString) s += '"';
-
-  // Remove trailing comma
   s = s.replace(/,\s*$/, "");
-
-  // Close remaining brackets
   while (stack.length) s += stack.pop();
 
   return s;

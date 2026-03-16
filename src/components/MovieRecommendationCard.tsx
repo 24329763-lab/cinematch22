@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Plus, Check, ExternalLink, Play } from "lucide-react";
+import { Plus, Check, ExternalLink, Play, Maximize2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -22,7 +22,15 @@ const slugify = (t: string) =>
 // Global poster cache
 const posterCache: Record<string, { url: string; overview?: string }> = {};
 
-const MovieRecommendationCard = ({ movie, index = 0 }: { movie: MovieRec; index?: number }) => {
+const MovieRecommendationCard = ({
+  movie,
+  index = 0,
+  onOpenDetail,
+}: {
+  movie: MovieRec;
+  index?: number;
+  onOpenDetail?: (movie: MovieRec, posterUrl: string) => void;
+}) => {
   const [added, setAdded] = useState(false);
   const [posterUrl, setPosterUrl] = useState<string>("/placeholder.svg");
   const [overview, setOverview] = useState<string | null>(null);
@@ -32,7 +40,6 @@ const MovieRecommendationCard = ({ movie, index = 0 }: { movie: MovieRec; index?
   const slug = slugify(movie.title);
 
   useEffect(() => {
-    // Check local first
     const localPoster = MOVIE_POSTERS[slug];
     if (localPoster) {
       setPosterUrl(localPoster);
@@ -44,7 +51,6 @@ const MovieRecommendationCard = ({ movie, index = 0 }: { movie: MovieRec; index?
       return;
     }
 
-    // Fetch from TMDB - use the clean title
     const fetchPoster = async () => {
       try {
         const { data, error } = await supabase.functions.invoke("tmdb-posters", {
@@ -91,6 +97,11 @@ const MovieRecommendationCard = ({ movie, index = 0 }: { movie: MovieRec; index?
     toast({ title: "Link copiado!" });
   };
 
+  const handleOpenDetail = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onOpenDetail?.(movie, posterUrl);
+  };
+
   const displayDescription = movie.reason || overview || movie.description;
 
   return (
@@ -103,6 +114,7 @@ const MovieRecommendationCard = ({ movie, index = 0 }: { movie: MovieRec; index?
       <div
         className="relative w-full aspect-[2/3] rounded-2xl overflow-hidden cursor-pointer group/rec"
         style={{ boxShadow: "0 8px 30px rgba(0,0,0,0.5)" }}
+        onClick={handleOpenDetail}
       >
         <img src={posterUrl} alt={movie.title} className="w-full h-full object-cover transition-transform duration-500 group-hover/rec:scale-110" />
 
@@ -129,7 +141,7 @@ const MovieRecommendationCard = ({ movie, index = 0 }: { movie: MovieRec; index?
 
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 opacity-0 group-hover/rec:opacity-100 transition-opacity duration-300">
           <div className="w-10 h-10 rounded-full gradient-primary flex items-center justify-center cinema-glow-sm">
-            <Play size={16} className="text-primary-foreground ml-0.5" fill="currentColor" />
+            <Maximize2 size={16} className="text-primary-foreground" />
           </div>
           <div className="flex gap-2">
             <button onClick={addToWatchlist} className="p-1.5 rounded-full glass text-foreground hover:bg-white/20 transition-all">
@@ -163,23 +175,19 @@ export function parseMovieRecommendations(content: string): MovieRec[] {
   while ((match = regex.exec(content)) !== null) {
     let title = match[1].replace(/[🎬🎥🎞️]/g, "").trim();
     
-    // If title has "/" take only the first part
     if (title.includes("/")) {
       title = title.split("/")[0].trim();
     }
-    // Remove trailing ":" or "-"
     title = title.replace(/[:\-]$/, "").trim();
     
     const year = parseInt(match[2]);
     const afterMatch = content.slice(match.index, match.index + 600);
     
-    // Extract platforms
     const platforms: string[] = [];
     if (/netflix/i.test(afterMatch)) platforms.push("Netflix");
     if (/prime\s*video/i.test(afterMatch)) platforms.push("Prime");
     if (/disney\+?/i.test(afterMatch)) platforms.push("Disney+");
 
-    // Extract reason: text after the **title** line
     const afterTitle = afterMatch.slice(match[0].length);
     const reasonLines = afterTitle.split("\n").map(l => l.replace(/^[\s*\-:]+/, "").trim()).filter(l => l.length > 15 && !l.startsWith("**"));
     const reason = reasonLines[0] || undefined;
