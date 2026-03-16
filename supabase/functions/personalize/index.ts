@@ -549,7 +549,18 @@ function deterministicJitter(seed: string, modulo: number): number {
 
 function repairJson(text: string): string {
   let s = text.trim();
-  const opens = { "{": "}", "[": "]" };
+
+  // Remove markdown code fences
+  s = s.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
+
+  // Fix missing values: "key":} or "key":] or "key":,
+  s = s.replace(/":\s*([}\],])/g, '":null$1');
+
+  // Fix trailing commas
+  s = s.replace(/,\s*}/g, "}").replace(/,\s*]/g, "]");
+
+  // Close unbalanced brackets/braces
+  const opens: Record<string, string> = { "{": "}", "[": "]" };
   const closes = new Set(["}", "]"]);
   const stack: string[] = [];
   let inString = false;
@@ -561,7 +572,7 @@ function repairJson(text: string): string {
     if (ch === "\\") { escape = true; continue; }
     if (ch === '"') { inString = !inString; continue; }
     if (inString) continue;
-    if (ch in opens) stack.push(opens[ch as "{" | "["]);
+    if (ch in opens) stack.push(opens[ch]);
     else if (closes.has(ch)) stack.pop();
   }
 
