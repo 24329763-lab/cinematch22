@@ -54,6 +54,7 @@ const PosterCard = ({
     if (!error) {
       setAdded(true);
       toast({ title: "Adicionado à sua lista!" });
+      captureWatchlistAdd(movie.title, movie.genres);
     }
   };
 
