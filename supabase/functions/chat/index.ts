@@ -159,10 +159,8 @@ REGRAS: Sem notas de IMDb/RT. Sem inventar filmes. Sem textão.`;
       );
     }
 
-    // Fire taste extraction in the background
-    if (userId && messages.length >= 2) {
-      extractTasteSignals(messages, userId, GEMINI_API_KEY).catch(() => {});
-    }
+    // Taste extraction will run inside the stream block after streaming completes
+    const shouldExtract = !!userId && messages.length >= 1;
 
     // Transform Gemini SSE stream to OpenAI-compatible SSE stream
     const { readable, writable } = new TransformStream();
