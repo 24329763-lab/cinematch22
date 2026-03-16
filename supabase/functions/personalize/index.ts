@@ -181,7 +181,14 @@ JSON OBRIGATÓRIO (sem texto extra):
     const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!content) throw new Error("No AI response");
 
-    const result = JSON.parse(content);
+    let result: any;
+    try {
+      result = JSON.parse(content);
+    } catch {
+      // Try to repair truncated JSON
+      const repaired = repairJson(content);
+      result = JSON.parse(repaired);
+    }
     const normalizedSections = normalizeSections(result.sections || [], tasteNote, tasteSignals);
 
     const finalPayload = {
