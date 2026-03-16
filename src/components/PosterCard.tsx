@@ -67,7 +67,7 @@ const PosterCard = ({
       initial={{ opacity: 0, scale: 0.92 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.4, delay: index * 0.05, ease: [0.25, 0.46, 0.45, 0.94] }}
-      className="relative flex-shrink-0 w-[240px] h-[360px] rounded-2xl overflow-hidden cursor-pointer group/card peer"
+      className="poster-card relative flex-shrink-0 rounded-2xl overflow-hidden cursor-pointer group/card peer"
       onClick={() => onSelect?.(movie)}
       style={{ boxShadow: "0 8px 30px rgba(0,0,0,0.5)" }}
     >
@@ -115,7 +115,7 @@ const PosterCard = ({
         </div>
       </div>
 
-      {/* Hover overlay - actions only, NO dark tint on this card */}
+      {/* Hover overlay - actions only */}
       <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 opacity-0 group-hover/card:opacity-100 transition-opacity duration-300">
         <div className="w-12 h-12 rounded-full gradient-primary flex items-center justify-center cinema-glow-sm">
           <Play size={20} className="text-primary-foreground ml-0.5" fill="currentColor" />

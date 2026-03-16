@@ -22,7 +22,6 @@ const HERO = {
   description: "Fernanda Torres em performance aclamada mundialmente. Baseado na história real de Eunice Paiva durante a ditadura militar brasileira.",
   backdropUrl: MOVIE_BACKDROPS["ainda-estou-aqui"] || "/posters/ainda-estou-aqui-backdrop.jpg",
   posterUrl: "/posters/ainda-estou-aqui.jpg",
-  dominantColor: { r: 40, g: 60, b: 80 },
 };
 
 const SectionHeader = ({
@@ -77,45 +76,39 @@ const HomePage = () => {
 
   return (
     <div className="min-h-[calc(100dvh-4rem)] overflow-y-auto pb-24 relative">
-      {/* Dynamic background gradient from hero */}
-      <div className="fixed inset-0 pointer-events-none -z-10">
+      {/* Netflix-style blurred gradient spots */}
+      <div className="fixed inset-0 pointer-events-none -z-10 overflow-hidden">
         <div
-          className="absolute top-0 left-0 w-full h-[70vh]"
-          style={{
-            background: `radial-gradient(ellipse 90% 60% at 50% 0%, rgba(${HERO.dominantColor.r}, ${HERO.dominantColor.g}, ${HERO.dominantColor.b}, 0.22) 0%, transparent 70%)`,
-          }}
+          className="absolute top-[-10%] left-[-5%] w-[50%] h-[50%] rounded-full blur-[200px] opacity-20"
+          style={{ background: "hsl(280, 70%, 50%)" }}
         />
         <div
-          className="absolute top-[20%] right-0 w-[40%] h-[40%] rounded-full blur-[180px]"
-          style={{
-            background: `rgba(${HERO.dominantColor.r + 30}, ${HERO.dominantColor.g}, ${HERO.dominantColor.b + 40}, 0.08)`,
-          }}
+          className="absolute top-[10%] right-[-10%] w-[45%] h-[45%] rounded-full blur-[200px] opacity-15"
+          style={{ background: "hsl(330, 80%, 55%)" }}
         />
         <div
-          className="absolute bottom-[10%] left-[10%] w-[30%] h-[30%] rounded-full blur-[150px]"
-          style={{
-            background: `rgba(${HERO.dominantColor.r}, ${HERO.dominantColor.g + 20}, ${HERO.dominantColor.b + 20}, 0.06)`,
-          }}
+          className="absolute bottom-[5%] left-[20%] w-[40%] h-[35%] rounded-full blur-[180px] opacity-10"
+          style={{ background: "hsl(260, 60%, 45%)" }}
         />
       </div>
 
-      {/* Hero Card - nearly full width */}
+      {/* Hero Card - full card with image, nearly full width */}
       <div className="px-3 pt-3">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] }}
-          className="relative rounded-3xl overflow-hidden"
+          className="relative rounded-3xl overflow-hidden glass-surface-strong"
           style={{ boxShadow: "0 20px 60px rgba(0,0,0,0.6)" }}
         >
-          <div className="relative h-[65vh] min-h-[400px] max-h-[700px]">
+          <div className="relative h-[70vh] min-h-[420px] max-h-[750px]">
             <img
               src={HERO.backdropUrl}
               alt={HERO.title}
               className="w-full h-full object-cover"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent" />
-            <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-transparent to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/30 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-transparent to-transparent" />
 
             <div className="absolute bottom-0 left-0 right-0 p-8 sm:p-10">
               <div className="flex items-center gap-2.5 mb-3">
@@ -127,7 +120,7 @@ const HomePage = () => {
                 </span>
               </div>
 
-              <h1 className="text-5xl sm:text-6xl font-black tracking-display mb-3 text-foreground">
+              <h1 className="text-5xl sm:text-6xl lg:text-7xl font-black tracking-display mb-3 text-foreground">
                 {HERO.title}
               </h1>
 

@@ -1,6 +1,6 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Sparkles, Menu, ThumbsUp, ThumbsDown, Share2 } from "lucide-react";
+import { Send, Sparkles, Menu, ThumbsUp, ThumbsDown, Share2, ChevronLeft, ChevronRight } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { streamChat } from "@/lib/chat-stream";
 import { useToast } from "@/hooks/use-toast";
@@ -24,6 +24,47 @@ const SUGGESTIONS = [
   "Documentário brasileiro impactante",
 ];
 
+const ChatMovieScroll = ({ movies }: { movies: ReturnType<typeof parseMovieRecommendations> }) => {
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const scroll = (dir: "left" | "right") => {
+    if (!scrollRef.current) return;
+    const amount = 220;
+    scrollRef.current.scrollBy({ left: dir === "left" ? -amount : amount, behavior: "smooth" });
+  };
+
+  return (
+    <div className="relative group/chatscroll -mx-4">
+      <button
+        onClick={() => scroll("left")}
+        className="absolute left-0 top-0 bottom-0 z-10 w-10 bg-gradient-to-r from-background/90 to-transparent flex items-center justify-start pl-1 opacity-0 group-hover/chatscroll:opacity-100 transition-opacity"
+      >
+        <div className="w-7 h-7 rounded-full glass flex items-center justify-center">
+          <ChevronLeft size={14} className="text-foreground" />
+        </div>
+      </button>
+
+      <div
+        ref={scrollRef}
+        className="flex gap-4 overflow-x-auto scrollbar-hide px-4 py-2 scroll-smooth"
+      >
+        {movies.map((movie, i) => (
+          <MovieRecommendationCard key={movie.title + i} movie={movie} index={i} />
+        ))}
+      </div>
+
+      <button
+        onClick={() => scroll("right")}
+        className="absolute right-0 top-0 bottom-0 z-10 w-10 bg-gradient-to-l from-background/90 to-transparent flex items-center justify-end pr-1 opacity-0 group-hover/chatscroll:opacity-100 transition-opacity"
+      >
+        <div className="w-7 h-7 rounded-full glass flex items-center justify-center">
+          <ChevronRight size={14} className="text-foreground" />
+        </div>
+      </button>
+    </div>
+  );
+};
+
 const ChatPage = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -39,7 +80,6 @@ const ChatPage = () => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages]);
 
-  // Load conversations
   useEffect(() => {
     if (!user) return;
     supabase
@@ -51,7 +91,6 @@ const ChatPage = () => {
       });
   }, [user]);
 
-  // Load messages for active conversation
   useEffect(() => {
     if (!activeConvId) { setMessages([]); return; }
     supabase
@@ -91,7 +130,6 @@ const ChatPage = () => {
       .insert({ conversation_id: convId, role, content })
       .select("id")
       .single();
-    // Update conversation timestamp
     await supabase.from("conversations").update({ updated_at: new Date().toISOString() }).eq("id", convId);
     return data?.id;
   };
@@ -105,7 +143,6 @@ const ChatPage = () => {
     setInput("");
     setIsLoading(true);
 
-    // Create or use existing conversation
     let convId = activeConvId;
     if (!convId && user) {
       const title = messageText.length > 40 ? messageText.slice(0, 40) + "..." : messageText;
@@ -177,6 +214,70 @@ const ChatPage = () => {
 
   const isEmpty = messages.length === 0;
 
+  // Split assistant content: remove movie bold-title blocks for clean text, show cards separately
+  const renderAssistantMessage = (msg: Message) => {
+    const movieRecs = parseMovieRecommendations(msg.content);
+    // Strip the movie recommendation blocks from the text to avoid duplication
+    // Keep only non-movie text (intro, follow-up question, etc.)
+    let cleanContent = msg.content;
+
+    // Extract follow-up question (usually the last paragraph or line with ?)
+    const lines = cleanContent.split("\n").filter(l => l.trim());
+    const lastLine = lines[lines.length - 1]?.trim() || "";
+    const hasFollowUp = lastLine.includes("?") && !lastLine.startsWith("**");
+
+    return (
+      <div className="space-y-3">
+        {/* Text content - show intro text before movie cards */}
+        {movieRecs.length > 0 ? (
+          <>
+            {/* Show intro text (text before first movie recommendation) */}
+            {(() => {
+              const firstMovieIdx = cleanContent.search(/\*\*[🎬🎥🎞️]*\s*.+?\*\*/);
+              const intro = firstMovieIdx > 0 ? cleanContent.slice(0, firstMovieIdx).trim() : "";
+              return intro ? (
+                <div className="glass rounded-2xl p-4 max-w-[90%]">
+                  <div className="prose prose-sm prose-invert max-w-none text-foreground/90 [&_strong]:text-foreground [&_p]:leading-relaxed">
+                    <ReactMarkdown>{intro}</ReactMarkdown>
+                  </div>
+                </div>
+              ) : null;
+            })()}
+
+            {/* Horizontal scrollable movie cards */}
+            <ChatMovieScroll movies={movieRecs} />
+
+            {/* Follow-up question */}
+            {hasFollowUp && (
+              <div className="glass rounded-2xl p-4 max-w-[90%]">
+                <p className="text-sm text-foreground/90 leading-relaxed">{lastLine}</p>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="glass rounded-2xl p-4 max-w-[90%]">
+            <div className="prose prose-sm prose-invert max-w-none text-foreground/90 [&_strong]:text-foreground [&_p]:leading-relaxed [&_li]:text-sm [&_ul]:space-y-1">
+              <ReactMarkdown>{msg.content}</ReactMarkdown>
+            </div>
+          </div>
+        )}
+
+        {/* Actions */}
+        <div className="flex items-center gap-1.5 pl-1">
+          <button onClick={() => toggleLike(msg, true)} className={`p-1.5 rounded-lg transition-all ${msg.liked === true ? "text-cinema-gold" : "text-muted-foreground hover:text-foreground"}`}>
+            <ThumbsUp size={14} />
+          </button>
+          <button onClick={() => toggleLike(msg, false)} className={`p-1.5 rounded-lg transition-all ${msg.liked === false ? "text-destructive" : "text-muted-foreground hover:text-foreground"}`}>
+            <ThumbsDown size={14} />
+          </button>
+          <button onClick={() => shareMessage(msg)} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground transition-all">
+            <Share2 size={14} />
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="flex h-[calc(100dvh-4rem)]">
       <ChatSidebar
@@ -226,50 +327,19 @@ const ChatPage = () => {
               </motion.div>
             ) : (
               <div className="py-4 space-y-4 max-w-2xl mx-auto">
-                {messages.map((msg) => {
-                  const movieRecs = msg.role === "assistant" ? parseMovieRecommendations(msg.content) : [];
-                  return (
-                    <motion.div key={msg.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
-                      {msg.role === "user" ? (
-                        <div className="flex justify-end">
-                          <div className="gradient-primary text-primary-foreground px-4 py-2.5 rounded-2xl rounded-br-md max-w-[85%] text-sm shadow-lg">
-                            {msg.content}
-                          </div>
+                {messages.map((msg) => (
+                  <motion.div key={msg.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+                    {msg.role === "user" ? (
+                      <div className="flex justify-end">
+                        <div className="gradient-primary text-primary-foreground px-4 py-2.5 rounded-2xl rounded-br-md max-w-[85%] text-sm shadow-lg">
+                          {msg.content}
                         </div>
-                      ) : (
-                        <div className="space-y-3">
-                          <div className="glass rounded-2xl p-4 max-w-[90%]">
-                            <div className="prose prose-sm prose-invert max-w-none text-foreground/90 [&_strong]:text-foreground [&_p]:leading-relaxed [&_li]:text-sm [&_ul]:space-y-1">
-                              <ReactMarkdown>{msg.content}</ReactMarkdown>
-                            </div>
-                          </div>
-
-                          {/* Movie cards */}
-                          {movieRecs.length > 0 && (
-                            <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2 pl-1">
-                              {movieRecs.map((movie, i) => (
-                                <MovieRecommendationCard key={movie.title + i} movie={movie} index={i} />
-                              ))}
-                            </div>
-                          )}
-
-                          {/* Actions */}
-                          <div className="flex items-center gap-1.5 pl-1">
-                            <button onClick={() => toggleLike(msg, true)} className={`p-1.5 rounded-lg transition-all ${msg.liked === true ? "text-cinema-gold" : "text-muted-foreground hover:text-foreground"}`}>
-                              <ThumbsUp size={14} />
-                            </button>
-                            <button onClick={() => toggleLike(msg, false)} className={`p-1.5 rounded-lg transition-all ${msg.liked === false ? "text-destructive" : "text-muted-foreground hover:text-foreground"}`}>
-                              <ThumbsDown size={14} />
-                            </button>
-                            <button onClick={() => shareMessage(msg)} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground transition-all">
-                              <Share2 size={14} />
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </motion.div>
-                  );
-                })}
+                      </div>
+                    ) : (
+                      renderAssistantMessage(msg)
+                    )}
+                  </motion.div>
+                ))}
 
                 {isLoading && messages[messages.length - 1]?.role !== "assistant" && (
                   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-2.5 text-sm text-muted-foreground glass rounded-2xl px-4 py-3 w-fit">
