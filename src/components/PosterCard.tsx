@@ -85,8 +85,12 @@ const PosterCard = ({
 
       {/* Platform badges */}
       <div className="absolute top-2 right-2 flex gap-1">
-        {movie.platforms.map((p) => {
-          const cfg = platformBadge[p];
+        {(movie.platforms || []).map((p) => {
+          const key = p.toLowerCase().replace(/\s+/g, "") as string;
+          const cfg = platformBadge[key as Platform] || platformBadge[
+            key.includes("netflix") ? "netflix" : key.includes("prime") ? "prime" : key.includes("disney") ? "disney" : ""
+          ];
+          if (!cfg) return null;
           return (
             <span key={p} className={`${cfg.bg} text-foreground text-[9px] font-bold w-5 h-5 rounded-md flex items-center justify-center shadow-lg`}>
               {cfg.label}
