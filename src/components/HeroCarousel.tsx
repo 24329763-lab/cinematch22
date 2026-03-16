@@ -148,7 +148,7 @@ export default function HeroCarousel({ personalizedSections, hasPersonalization,
         const key = String(movie.id || movie.title);
         if (!dedup.has(key)) dedup.set(key, movieToHero(movie));
       }
-      const personal = Array.from(dedup.values());
+      const personal = Array.from(dedup.values()).filter((movie) => hasQualityPoster(movie.posterUrl));
       if (personal.length >= 2) return personal;
     }
 

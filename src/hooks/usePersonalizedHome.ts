@@ -74,7 +74,7 @@ export function usePersonalizedHome() {
             posterUrl: buildPosterUrl(m),
             platforms: m.platforms || ["netflix"],
             genres: m.genres || [],
-            matchPercent: m.matchPercent,
+            matchPercent: typeof m.matchPercent === "number" ? m.matchPercent : undefined,
             description: m.description,
           })),
         }));
