@@ -31,7 +31,7 @@ const HorizontalScroll = ({ children, className = "" }: HorizontalScrollProps) =
 
       <div
         ref={scrollRef}
-        className={`flex gap-4 overflow-x-auto scrollbar-hide px-5 py-2 scroll-smooth ${className}`}
+        className={`card-row flex gap-5 overflow-x-auto scrollbar-hide px-5 py-4 scroll-smooth ${className}`}
       >
         {children}
       </div>
