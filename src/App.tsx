@@ -53,7 +53,7 @@ const AppContent = () => {
         <Route path="/party/:friendId" element={<PartyPage />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
-      <BottomNav />
+      <BottomNav hide={pathname === "/auth" || pathname === "/onboarding"} />
     </div>
   );
 };
