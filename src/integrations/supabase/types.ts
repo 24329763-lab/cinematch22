@@ -133,12 +133,14 @@ export type Database = {
       profiles: {
         Row: {
           avatar_url: string | null
+          blocked_elements: string[] | null
           created_at: string | null
           display_name: string | null
           favorite_genres: string[] | null
           friend_code: string
           id: string
           nickname: string | null
+          onboarding_complete: boolean | null
           platforms: string[] | null
           preferred_era: string | null
           preferred_mood: string | null
@@ -149,12 +151,14 @@ export type Database = {
         }
         Insert: {
           avatar_url?: string | null
+          blocked_elements?: string[] | null
           created_at?: string | null
           display_name?: string | null
           favorite_genres?: string[] | null
           friend_code?: string
           id?: string
           nickname?: string | null
+          onboarding_complete?: boolean | null
           platforms?: string[] | null
           preferred_era?: string | null
           preferred_mood?: string | null
@@ -165,12 +169,14 @@ export type Database = {
         }
         Update: {
           avatar_url?: string | null
+          blocked_elements?: string[] | null
           created_at?: string | null
           display_name?: string | null
           favorite_genres?: string[] | null
           friend_code?: string
           id?: string
           nickname?: string | null
+          onboarding_complete?: boolean | null
           platforms?: string[] | null
           preferred_era?: string | null
           preferred_mood?: string | null
@@ -214,6 +220,36 @@ export type Database = {
           source?: string
           user_id?: string
           value?: string
+        }
+        Relationships: []
+      }
+      user_mood_signals: {
+        Row: {
+          context: string | null
+          created_at: string | null
+          id: string
+          intensity: number
+          mood: string
+          source: string
+          user_id: string
+        }
+        Insert: {
+          context?: string | null
+          created_at?: string | null
+          id?: string
+          intensity?: number
+          mood: string
+          source?: string
+          user_id: string
+        }
+        Update: {
+          context?: string | null
+          created_at?: string | null
+          id?: string
+          intensity?: number
+          mood?: string
+          source?: string
+          user_id?: string
         }
         Relationships: []
       }
