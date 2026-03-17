@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
 import type { User, Session } from "@supabase/supabase-js";
 
@@ -27,7 +26,7 @@ export function useAuth() {
 
   const fetchProfile = async (userId: string) => {
     try {
-      const { data, error } = await supabase.from("profiles").select("*").eq("user_id", userId).single();
+      const { data, error } = await lovable.db.from("profiles").select("*").eq("user_id", userId).single();
 
       if (error) throw error;
       setProfile(data);

@@ -6,7 +6,7 @@ import { streamChat } from "@/lib/chat-stream";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { lovable } from "@/integrations/lovable/index";
 
 type Message = {
   id: string;
@@ -96,28 +96,22 @@ const OnboardingPage = () => {
   const finishOnboarding = async () => {
     setIsFinishing(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/onboarding-chat`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session?.access_token}`,
-        },
-        body: JSON.stringify({
+      const { data, error } = await lovable.functions.invoke("onboarding-chat", {
+        body: {
           messages: messages.map(m => ({ role: m.role, content: m.content })),
           complete: true
-        }),
+        }
       });
 
-      if (response.ok) {
-        toast({ title: "Tudo pronto!", description: "Seu perfil foi configurado com sucesso." });
+      if (!error) {
+        toast({ title: "All set!", description: "Your profile has been successfully configured." });
         setTimeout(() => navigate("/"), 2000);
       } else {
-        throw new Error("Falha ao finalizar onboarding");
+        throw error;
       }
     } catch (error) {
       console.error(error);
-      toast({ variant: "destructive", title: "Erro ao salvar perfil", description: "Tente novamente." });
+      toast({ variant: "destructive", title: "Error saving profile", description: "Please try again." });
     } finally {
       setIsFinishing(false);
     }

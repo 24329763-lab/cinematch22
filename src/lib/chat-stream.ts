@@ -1,4 +1,4 @@
-import { supabase } from "@/integrations/supabase/client";
+import { lovable } from "@/integrations/lovable/index";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
@@ -15,7 +15,7 @@ export async function streamChat({
   onError?: (error: string) => void;
   endpoint?: string;
 }) {
-  const { data: sessionData } = await supabase.auth.getSession();
+  const { data: sessionData } = await lovable.auth.getSession();
   const accessToken = sessionData?.session?.access_token;
 
   const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${endpoint}`;

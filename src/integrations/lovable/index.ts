@@ -39,5 +39,12 @@ export const lovable = {
     signOut: () => supabase.auth.signOut(),
     onAuthStateChange: (callback: any) => supabase.auth.onAuthStateChange(callback),
     getSession: () => supabase.auth.getSession(),
+    getUser: () => supabase.auth.getUser(),
   },
+  functions: {
+    invoke: (name: string, options: any) => supabase.functions.invoke(name, options),
+  },
+  db: {
+    from: (table: string) => supabase.from(table),
+  }
 };

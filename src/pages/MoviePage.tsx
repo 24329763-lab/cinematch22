@@ -2,7 +2,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Star, Play, Plus, Check, ArrowLeft, Share2, Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { lovable } from "@/integrations/lovable/index";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import type { MoviePoster } from "@/lib/tmdb";
@@ -30,7 +30,7 @@ const MoviePage = () => {
       setLoading(true);
       try {
         const query = slug.replace(/-/g, " ");
-        const { data: session } = await supabase.auth.getSession();
+        const { data: session } = await lovable.auth.getSession();
         const token = session?.session?.access_token;
 
         const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/tmdb_proxy`, {
@@ -51,7 +51,7 @@ const MoviePage = () => {
 
         if (tmdbMovie) {
           if (user) {
-            const { data: watchData } = await supabase
+            const { data: watchData } = await lovable.db
               .from("watchlist")
               .select("id")
               .eq("user_id", user.id)
@@ -108,10 +108,10 @@ const MoviePage = () => {
 
   const addToWatchlist = async () => {
     if (!user) {
-      toast({ variant: "destructive", title: "Faça login para salvar" });
+      toast({ variant: "destructive", title: "Log in to save" });
       return;
     }
-    const { error } = await supabase.from("watchlist").upsert(
+    const { error } = await lovable.db.from("watchlist").upsert(
       {
         user_id: user.id,
         movie_id: movie.id,
