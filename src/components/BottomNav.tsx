@@ -1,4 +1,4 @@
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import { MessageSquare, Home, User, Heart } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -10,6 +10,11 @@ const navItems = [
 ];
 
 const BottomNav = () => {
+  const { pathname } = useLocation();
+  const hideNav = pathname === "/onboarding" || pathname === "/auth";
+
+  if (hideNav) return null;
+
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 glass-surface-strong border-t border-border/50">
       <div className="flex items-center justify-around h-16 max-w-lg mx-auto px-4">
