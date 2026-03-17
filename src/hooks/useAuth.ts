@@ -1,89 +1,77 @@
-import { useState, useEffect, useContext, createContext, ReactNode } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { User, Session } from "@supabase/supabase-js";
 
-interface AuthContextType {
-  user: User | null;
-  profile: any | null;
-  session: Session | null;
-  loading: boolean;
-  signOut: () => Promise<void>;
-  refreshProfile: () => Promise<void>;
-}
+// Internal state to keep track of the user globally
+let globalUser: User | null = null;
+let globalProfile: any | null = null;
+let globalSession: Session | null = null;
+let globalLoading = true;
+const listeners = new Set<() => void>();
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+// Helper to notify all hooks when state changes
+const notify = () => listeners.forEach((l) => l());
+
+// Initialize Supabase Auth Listener once
+const initAuth = () => {
+  supabase.auth.onAuthStateChange(async (_event, session) => {
+    globalSession = session;
+    globalUser = session?.user ?? null;
+    if (session?.user) {
+      const { data } = await supabase.from("profiles").select("*").eq("user_id", session.user.id).maybeSingle();
+      globalProfile = data;
+    } else {
+      globalProfile = null;
+    }
+    globalLoading = false;
+    notify();
+  });
+
+  // Get initial session
+  supabase.auth.getSession().then(async ({ data: { session } }) => {
+    globalSession = session;
+    globalUser = session?.user ?? null;
+    if (session?.user) {
+      const { data } = await supabase.from("profiles").select("*").eq("user_id", session.user.id).maybeSingle();
+      globalProfile = data;
+    }
+    globalLoading = false;
+    notify();
+  });
+};
+
+// Start the listener immediately
+initAuth();
 
 export function useAuth() {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider");
-  }
-  return context;
-}
-
-interface AuthProviderProps {
-  children: ReactNode;
-}
-
-export function AuthProvider({ children }: AuthProviderProps) {
-  const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<any | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  const fetchProfile = async (userId: string) => {
-    try {
-      const { data, error } = await supabase.from("profiles").select("*").eq("user_id", userId).maybeSingle();
-
-      if (error) throw error;
-      if (data) {
-        setProfile(data);
-      }
-    } catch (err) {
-      console.error("Error fetching profile:", err);
-    }
-  };
+  const [, setTick] = useState(0);
 
   useEffect(() => {
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        await fetchProfile(session.user.id);
-      } else {
-        setProfile(null);
-      }
-      setLoading(false);
-    });
-
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        await fetchProfile(session.user.id);
-      }
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
+    const forceUpdate = () => setTick((t) => t + 1);
+    listeners.add(forceUpdate);
+    return () => {
+      listeners.delete(forceUpdate);
+    };
   }, []);
 
   const signOut = async () => {
     await supabase.auth.signOut();
   };
 
-  const value = {
-    user,
-    session,
-    profile,
-    loading,
-    signOut,
-    refreshProfile: async () => {
-      if (user) await fetchProfile(user.id);
-    },
+  const refreshProfile = async () => {
+    if (globalUser) {
+      const { data } = await supabase.from("profiles").select("*").eq("user_id", globalUser.id).maybeSingle();
+      globalProfile = data;
+      notify();
+    }
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return {
+    user: globalUser,
+    session: globalSession,
+    profile: globalProfile,
+    loading: globalLoading,
+    signOut,
+    refreshProfile,
+  };
 }
