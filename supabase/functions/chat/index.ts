@@ -8,7 +8,54 @@ const corsHeaders = {
 };
 
 const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
+const TMDB_BASE = "https://api.themoviedb.org/3";
 
+// --- Fetch user context from DB ---
+async function getUserContext(userId: string) {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const db = createClient(supabaseUrl, serviceKey);
+
+  const [profileRes, signalsRes] = await Promise.all([
+    db.from("profiles").select("blocked_elements, platforms").eq("user_id", userId).single(),
+    db.from("taste_signals").select("signal_type, category, value, confidence")
+      .eq("user_id", userId)
+      .order("confidence", { ascending: false })
+      .limit(40),
+  ]);
+
+  const profile = profileRes.data;
+  const signals = signalsRes.data || [];
+
+  const likes = signals.filter(s => ["like", "preference", "interest"].includes(s.signal_type));
+  const avoids = signals.filter(s => ["dislike", "avoid"].includes(s.signal_type));
+  const blocked = profile?.blocked_elements || [];
+  const platforms = profile?.platforms || [];
+
+  return { likes, avoids, blocked, platforms };
+}
+
+// --- TMDB search to ground recommendations ---
+async function searchTMDB(query: string): Promise<string> {
+  const tmdbKey = Deno.env.get("TMDB_API_KEY");
+  if (!tmdbKey) return "";
+  try {
+    const resp = await fetch(
+      `${TMDB_BASE}/search/movie?query=${encodeURIComponent(query)}&language=pt-BR&page=1&api_key=${tmdbKey}`
+    );
+    if (!resp.ok) return "";
+    const data = await resp.json();
+    const results = (data.results || []).slice(0, 5);
+    if (results.length === 0) return "";
+    return results.map((m: any) =>
+      `- ${m.title} (${m.release_date?.slice(0, 4) || "?"}) — ${m.overview?.slice(0, 100) || ""}...`
+    ).join("\n");
+  } catch {
+    return "";
+  }
+}
+
+// --- Taste signal extraction (non-blocking, fires after stream) ---
 async function extractTasteSignals(messages: { role: string; content: string }[], userId: string) {
   try {
     if (messages.length < 1) return;
@@ -71,7 +118,6 @@ Se não houver sinais claros, retorne {"signals": []}`,
     const text = data.choices?.[0]?.message?.content;
     if (!text) return;
 
-    // Extract JSON from possible markdown code blocks
     let jsonStr = text;
     const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
     if (jsonMatch) jsonStr = jsonMatch[1];
@@ -108,7 +154,7 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    // Try to get user ID for taste extraction
+    // Authenticate user
     let userId: string | null = null;
     const authHeader = req.headers.get("Authorization");
     if (authHeader) {
@@ -124,12 +170,44 @@ serve(async (req) => {
     }
 
     // Detect conversation mode
-    const lastUserMsg = messages.filter((m: any) => m.role === "user").pop()?.content?.toLowerCase() || "";
-    const isTasteMode = /\b(meu gosto|gosto em filmes|que tipo de filme|me conhecer|perfil|preferências|o que eu curto|entender meu gosto|conversar sobre|quero conversar)\b/i.test(lastUserMsg);
+    const lastUserMsg = messages.filter((m: any) => m.role === "user").pop()?.content || "";
+    const lastUserMsgLower = lastUserMsg.toLowerCase();
+    const isTasteMode = /\b(meu gosto|gosto em filmes|que tipo de filme|me conhecer|perfil|preferências|o que eu curto|entender meu gosto|conversar sobre|quero conversar)\b/i.test(lastUserMsgLower);
+    const isSearchMode = !isTasteMode && lastUserMsg.length > 5;
+
+    // Fetch user context from DB (parallel with TMDB search)
+    const [userCtx, tmdbResults] = await Promise.all([
+      userId ? getUserContext(userId) : Promise.resolve({ likes: [], avoids: [], blocked: [], platforms: [] }),
+      isSearchMode ? searchTMDB(lastUserMsg) : Promise.resolve(""),
+    ]);
+
+    // Build user profile section for the system prompt
+    let profileSection = "";
+    if (userCtx.likes.length > 0) {
+      const likesList = userCtx.likes.slice(0, 15).map(s => `${s.value} (${s.category})`).join(", ");
+      profileSection += `\nGOSTOS DO USUÁRIO: ${likesList}`;
+    }
+    if (userCtx.avoids.length > 0) {
+      const avoidList = userCtx.avoids.slice(0, 10).map(s => s.value).join(", ");
+      profileSection += `\nEVITA: ${avoidList}`;
+    }
+    if (userCtx.blocked.length > 0) {
+      profileSection += `\nBLOQUEADO (NUNCA sugerir): ${userCtx.blocked.join(", ")}`;
+    }
+    if (userCtx.platforms.length > 0) {
+      profileSection += `\nPLATAFORMAS: ${userCtx.platforms.join(", ")}`;
+    }
+
+    // Build TMDB grounding section
+    let tmdbSection = "";
+    if (tmdbResults) {
+      tmdbSection = `\n\nDADOS REAIS DO TMDB (use para embasar recomendações):\n${tmdbResults}`;
+    }
 
     const systemPrompt = `Você é o CineMatch — conciso, esperto, cinéfilo. Português brasileiro sempre.
 
 Seja direto. Nada de introduções longas ou explicações óbvias. Fale como um amigo que manja de cinema, não como um robô.
+${profileSection}${tmdbSection}
 
 MODO ATUAL: ${isTasteMode ? "PERFIL DE GOSTO" : "RECOMENDAÇÃO"}
 
@@ -140,13 +218,13 @@ ${isTasteMode ? `MODO PERFIL DE GOSTO (ativo agora):
 - Pergunte "em que momento você assiste?" — chuva, sozinho, casal, noite, etc.
 - Conecte padrões: "parece que você curte histórias de superação, né?"
 - Pergunte sobre coisas que IRRITAM em filmes (clichês, finais, ritmo)
-- Explore fora do cinema: animais, viagens, hobbies — tudo ajuda a entender
 - Seja curioso e natural, não interrogador
 - Máximo 2 perguntas por mensagem` : `MODO RECOMENDAÇÃO (ativo agora):
 - OBRIGATÓRIO: **Título (Ano)** — sempre com ano entre parênteses
-- 1 frase curta dizendo POR QUE a pessoa vai curtir
+- 1 frase curta dizendo POR QUE a pessoa vai curtir (baseado nos gostos conhecidos se disponíveis)
 - Plataforma se souber (Netflix, Prime, Disney+)
 - 3-5 filmes, sem enrolação
+- Se tiver dados do TMDB, use-os para confirmar existência do filme
 - 1 pergunta curta no final pra refinar`}
 
 REGRAS GERAIS: Sem notas de IMDb/RT. Sem inventar filmes. Sem textão.`;
@@ -188,11 +266,7 @@ REGRAS GERAIS: Sem notas de IMDb/RT. Sem inventar filmes. Sem textão.`;
       );
     }
 
-    // Taste extraction runs after stream completes
     const shouldExtract = !!userId && messages.length >= 1;
-
-    // Gateway already returns OpenAI-compatible SSE, pass through directly
-    // but we need to tap into the stream for taste extraction
     const { readable, writable } = new TransformStream();
     const writer = writable.getWriter();
     const encoder = new TextEncoder();
@@ -209,12 +283,8 @@ REGRAS GERAIS: Sem notas de IMDb/RT. Sem inventar filmes. Sem textão.`;
           if (done) break;
           const chunk = decoder.decode(value, { stream: true });
           buffer += chunk;
-
-          // Pass through to client
           await writer.write(encoder.encode(chunk));
 
-          // Collect full response for taste extraction
-          let newlineIdx: number;
           const tempBuf = buffer;
           buffer = "";
           for (const line of tempBuf.split("\n")) {
@@ -229,7 +299,6 @@ REGRAS GERAIS: Sem notas de IMDb/RT. Sem inventar filmes. Sem textão.`;
           }
         }
 
-        // Extract taste signals after streaming completes
         if (shouldExtract && fullResponse) {
           const allMsgs = [...messages, { role: "assistant", content: fullResponse }];
           await extractTasteSignals(allMsgs, userId!);
