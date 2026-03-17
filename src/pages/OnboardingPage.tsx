@@ -15,13 +15,21 @@ const STEPS = [
   "Última: quais plataformas de streaming você usa? (Netflix, Prime, etc)"
 ];
 
+const FEEDBACK = [
+  "Legal! Adorei esses.",
+  "Entendi, faz todo o sentido.",
+  "Boa! Também curto.",
+  "Valeu pelo toque, anotado.",
+  "Perfeito!"
+];
+
 const OnboardingPage = () => {
   const [messages, setMessages] = useState<any[]>([]);
   const [input, setInput] = useState("");
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const { user, profile, signOut } = useAuth();
+  const { user, profile, signOut, refreshProfile } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -48,13 +56,16 @@ const OnboardingPage = () => {
 
     if (step < STEPS.length - 1) {
       const nextStep = step + 1;
-      setStep(nextStep);
       
-      // Artificial delay for personality
+      // Artificial delay for personality with feedback
       setTimeout(() => {
-        setMessages(prev => [...prev, { role: "assistant", content: STEPS[nextStep] }]);
+        setMessages(prev => [
+          ...prev, 
+          { role: "assistant", content: FEEDBACK[step] + " " + STEPS[nextStep] }
+        ]);
+        setStep(nextStep);
         setLoading(false);
-      }, 1000);
+      }, 800);
     } else {
       // Final step: process everything
       await finishOnboarding([...messages, userMsg]);
@@ -85,7 +96,10 @@ const OnboardingPage = () => {
         content: "Perfeito! Já entendi tudo. Estou preparando sua home personalizada agora mesmo... 🎬✨" 
       }]);
       
-      setTimeout(() => navigate("/"), 2500);
+      // Refresh profile state globally before navigating
+      if (refreshProfile) await refreshProfile();
+      
+      setTimeout(() => navigate("/"), 2000);
     } catch (err) {
       console.error(err);
       toast({ variant: "destructive", title: "Erro ao salvar perfil" });
