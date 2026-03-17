@@ -1,22 +1,10 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import {
-  Sparkles,
-  Heart,
-  Star,
-  Compass,
-  Flame,
-  TrendingUp,
-  Clock,
-  Globe,
-  Loader2,
-  MessageCircle,
-  Users,
-} from "lucide-react";
-import PosterCard from "@/components/PosterCard"; // Corrected import
-import MovieDetailModal from "@/components/MovieDetailModal"; // Corrected import
-import HorizontalScroll from "@/components/HorizontalScroll"; // Corrected import
-import HeroCarousel from "@/components/HeroCarousel"; // Corrected import
+import { Sparkles, Heart, Star, Compass, Flame, TrendingUp, Clock, Globe, Loader2, MessageCircle, Users } from "lucide-react";
+import PosterCard from "@/components/PosterCard";
+import MovieDetailModal from "@/components/MovieDetailModal";
+import HorizontalScroll from "@/components/HorizontalScroll";
+import HeroCarousel from "@/components/HeroCarousel";
 import { useAuth } from "@/hooks/useAuth";
 import { usePersonalizedHome } from "@/hooks/usePersonalizedHome";
 import { useNavigate } from "react-router-dom";
@@ -34,16 +22,7 @@ const ICON_MAP: Record<string, React.ElementType> = {
   sparkles: Sparkles,
 };
 
-// Re-integrated SectionHeader component
-const SectionHeader = ({
-  icon: Icon,
-  title,
-  subtitle,
-}: {
-  icon: React.ElementType;
-  title: string;
-  subtitle?: string;
-}) => (
+const SectionHeader = ({ icon: Icon, title, subtitle }: { icon: React.ElementType; title: string; subtitle?: string }) => (
   <div className="px-5 mb-4 flex items-center justify-between">
     <div className="flex items-center gap-2.5">
       <div className="w-7 h-7 rounded-lg gradient-primary flex items-center justify-center">
@@ -57,7 +36,6 @@ const SectionHeader = ({
   </div>
 );
 
-// Re-integrated ChatCTA component
 const ChatCTA = () => {
   const navigate = useNavigate();
   return (
@@ -71,8 +49,7 @@ const ChatCTA = () => {
       </div>
       <h3 className="text-lg font-bold text-foreground mb-2">Sua home pode ser muito melhor</h3>
       <p className="text-sm text-muted-foreground leading-relaxed mb-4 max-w-sm mx-auto">
-        Converse com o chat sobre seus filmes favoritos, o que você curte e o que não curte — quanto mais eu souber,
-        melhor fica sua home.
+        Converse com o chat sobre seus filmes favoritos, o que você curte e o que não curte — quanto mais eu souber, melhor fica sua home.
       </p>
       <button
         onClick={() => navigate("/chat")}
@@ -86,91 +63,67 @@ const ChatCTA = () => {
   );
 };
 
-interface Movie {
-  id: string;
-  title: string;
-  year: number;
-  rating: number;
-  genres: string[];
-  platforms: string[];
-  description: string;
-  posterUrl: string;
-  matchPercent?: number;
-}
-
 interface FriendWatchlist {
-  friendId: string;
   friendName: string;
-  movies: Movie[];
+  friendId: string;
+  movies: MoviePoster[];
 }
 
 const HomePage = () => {
-  const { user, profile } = useAuth(); // Added profile here
-  const { personalizedSections, isLoading: personalizationLoading, hasPersonalization } = usePersonalizedHome();
-  const [selectedMovie, setSelectedMovie] = useState<Movie | null>(null);
-  const [watchlistItems, setWatchlistItems] = useState<Movie[]>([]);
+  const { user } = useAuth();
+  const { personalizedSections, tasteSummary, isLoading: personalizationLoading, hasPersonalization } = usePersonalizedHome();
+  const [selectedMovie, setSelectedMovie] = useState<MoviePoster | null>(null);
+  const [watchlistItems, setWatchlistItems] = useState<MoviePoster[]>([]);
   const [friendRows, setFriendRows] = useState<FriendWatchlist[]>([]);
 
-  // Fetch Watchlist Items
+  // Fetch watchlist for "Minha Lista" row
   useEffect(() => {
-    const fetchWatchlist = async () => {
-      if (!user) {
-        setWatchlistItems([]);
-        return;
-      }
-      // NOTE: This assumes 'user_watchlist' table exists and is correctly typed in Supabase types.ts
-      const { data, error } = await supabase
-        .from("user_watchlist") // Use the new user_watchlist table
-        .select("movie_id, added_at")
-        .eq("user_id", user.id)
-        .order("added_at", { ascending: false });
-
-      if (error) {
-        console.error("Error fetching watchlist:", error);
-        return;
-      }
-
-      // For now, we'll just show placeholders or fetch minimal data.
-      // In a full implementation, you'd fetch full movie details from TMDB for these IDs.
-      const moviesFromWatchlist: Movie[] = data.map((item) => ({
-        id: item.movie_id,
-        title: `Movie ${item.movie_id}`, // Placeholder
-        year: 2024, // Placeholder
-        rating: 0, // Placeholder
-        genres: [], // Placeholder
-        platforms: [], // Placeholder
-        description: "", // Placeholder
-        posterUrl: "/placeholder.svg", // Placeholder
-      }));
-      setWatchlistItems(moviesFromWatchlist);
-    };
-
-    fetchWatchlist();
+    if (!user) return;
+    supabase
+      .from("watchlist")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("added_at", { ascending: false })
+      .limit(20)
+      .then(({ data }) => {
+        if (data && data.length > 0) {
+          setWatchlistItems(
+            data.map((item: any) => ({
+              id: item.movie_id,
+              title: item.title,
+              year: item.year || 2024,
+              rating: item.rating || 7.5,
+              posterUrl: item.poster_url || "/placeholder.svg",
+              platforms: (item.platforms || []) as ("netflix" | "prime" | "disney")[],
+              genres: item.genres || [],
+              description: "",
+            }))
+          );
+        }
+      });
   }, [user]);
 
-  // Fetch Friend Watchlists (Party Mode - will be fully implemented later)
+  // Fetch friend watchlists
   useEffect(() => {
+    if (!user) return;
     const loadFriendRows = async () => {
-      if (!user) {
-        setFriendRows([]);
-        return;
-      }
-      // Placeholder for friend fetching logic
-      // This will eventually use the new 'friends' and 'party_members' tables
-      const friendIds: string[] = []; // Example: get actual friend IDs from 'friends' table
+      const { data: invites } = await supabase
+        .from("friend_invites")
+        .select("*")
+        .eq("status", "accepted")
+        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`);
 
-      if (friendIds.length === 0) return;
+      if (!invites || invites.length === 0) return;
 
-      // NOTE: This assumes 'profiles' and 'user_watchlist' tables are correctly typed
+      const friendIds = invites.map((i: any) =>
+        i.sender_id === user.id ? i.receiver_id : i.sender_id
+      );
+
+      // Get profiles and watchlists in parallel
       const [profilesRes, ...watchlistResults] = await Promise.all([
-        supabase.from("profiles").select("id, nickname, display_name").in("id", friendIds),
+        supabase.from("profiles").select("user_id, display_name, nickname").in("user_id", friendIds),
         ...friendIds.map((fid: string) =>
-          supabase
-            .from("user_watchlist")
-            .select("movie_id")
-            .eq("user_id", fid)
-            .order("added_at", { ascending: false })
-            .limit(15),
+          supabase.from("watchlist").select("movie_id, title, year, rating, poster_url, platforms, genres").eq("user_id", fid).order("added_at", { ascending: false }).limit(15)
         ),
       ]);
 
@@ -178,27 +131,26 @@ const HomePage = () => {
       const rows: FriendWatchlist[] = [];
 
       friendIds.forEach((fid: string, idx: number) => {
-        const profile = profiles.find((p: any) => p.id === fid);
+        const profile = profiles.find((p: any) => p.user_id === fid);
         const items = (watchlistResults[idx] as any)?.data || [];
         if (items.length > 0) {
-          const friendMovies: Movie[] = items.map((item: any) => ({
-            id: item.movie_id,
-            title: `Friend Movie ${item.movie_id}`, // Placeholder
-            year: 2024, // Placeholder
-            rating: 0, // Placeholder
-            genres: [], // Placeholder
-            platforms: [], // Placeholder
-            description: "", // Placeholder
-            posterUrl: "/placeholder.svg", // Placeholder
-          }));
-
           rows.push({
             friendId: fid,
             friendName: (profile as any)?.nickname || (profile as any)?.display_name || "Amigo",
-            movies: friendMovies,
+            movies: items.map((item: any) => ({
+              id: item.movie_id,
+              title: item.title,
+              year: item.year || 2024,
+              rating: item.rating || 7.5,
+              posterUrl: item.poster_url || "/placeholder.svg",
+              platforms: (item.platforms || []) as ("netflix" | "prime" | "disney")[],
+              genres: item.genres || [],
+              description: "",
+            })),
           });
         }
       });
+
       setFriendRows(rows);
     };
     loadFriendRows();
@@ -207,18 +159,9 @@ const HomePage = () => {
   return (
     <div className="min-h-[calc(100dvh-4rem)] overflow-y-auto pb-24 relative">
       <div className="fixed inset-0 pointer-events-none -z-10 overflow-hidden">
-        <div
-          className="absolute top-[-10%] left-[-5%] w-[50%] h-[50%] rounded-full blur-[200px] opacity-20"
-          style={{ background: "hsl(280, 70%, 50%)" }}
-        />
-        <div
-          className="absolute top-[10%] right-[-10%] w-[45%] h-[45%] rounded-full blur-[200px] opacity-15"
-          style={{ background: "hsl(330, 80%, 55%)" }}
-        />
-        <div
-          className="absolute bottom-[5%] left-[20%] w-[40%] h-[35%] rounded-full blur-[180px] opacity-10"
-          style={{ background: "hsl(260, 60%, 45%)" }}
-        />
+        <div className="absolute top-[-10%] left-[-5%] w-[50%] h-[50%] rounded-full blur-[200px] opacity-20" style={{ background: "hsl(280, 70%, 50%)" }} />
+        <div className="absolute top-[10%] right-[-10%] w-[45%] h-[45%] rounded-full blur-[200px] opacity-15" style={{ background: "hsl(330, 80%, 55%)" }} />
+        <div className="absolute bottom-[5%] left-[20%] w-[40%] h-[35%] rounded-full blur-[180px] opacity-10" style={{ background: "hsl(260, 60%, 45%)" }} />
       </div>
 
       <HeroCarousel personalizedSections={personalizedSections} hasPersonalization={hasPersonalization} />
@@ -230,7 +173,21 @@ const HomePage = () => {
         </div>
       )}
 
-      {/* Removed the tasteSummary display as requested */}
+      {tasteSummary && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mx-5 mt-8 mb-2 glass rounded-2xl p-4 flex items-start gap-3"
+        >
+          <div className="w-8 h-8 rounded-xl gradient-primary flex items-center justify-center flex-shrink-0 cinema-glow-sm">
+            <Sparkles size={14} className="text-primary-foreground" />
+          </div>
+          <div>
+            <span className="text-[11px] font-bold gradient-text uppercase tracking-wider">Seu Perfil de Gosto</span>
+            <p className="text-sm text-foreground/80 mt-0.5 leading-relaxed">{tasteSummary}</p>
+          </div>
+        </motion.div>
+      )}
 
       {/* My List row */}
       {watchlistItems.length > 0 && (
@@ -245,20 +202,19 @@ const HomePage = () => {
       )}
 
       {/* Personalized sections */}
-      {hasPersonalization &&
-        personalizedSections.map((section, sIdx) => {
-          const IconComp = ICON_MAP[section.icon] || Heart;
-          return (
-            <section key={section.key} className={sIdx === 0 && watchlistItems.length === 0 ? "mt-8" : "mt-10"}>
-              <SectionHeader icon={IconComp} title={section.title} subtitle={section.subtitle} />
-              <HorizontalScroll>
-                {section.movies.map((movie, i) => (
-                  <PosterCard key={movie.id} movie={movie} index={i} onSelect={setSelectedMovie} />
-                ))}
-              </HorizontalScroll>
-            </section>
-          );
-        })}
+      {hasPersonalization && personalizedSections.map((section, sIdx) => {
+        const IconComp = ICON_MAP[section.icon] || Heart;
+        return (
+          <section key={section.key} className={sIdx === 0 && watchlistItems.length === 0 ? "mt-8" : "mt-10"}>
+            <SectionHeader icon={IconComp} title={section.title} subtitle={section.subtitle} />
+            <HorizontalScroll>
+              {section.movies.map((movie, i) => (
+                <PosterCard key={movie.id} movie={movie} index={i} onSelect={setSelectedMovie} />
+              ))}
+            </HorizontalScroll>
+          </section>
+        );
+      })}
 
       {/* Friend rows */}
       {friendRows.map((fr) => (
@@ -273,11 +229,15 @@ const HomePage = () => {
       ))}
 
       {/* Chat CTA when not enough personalized content */}
-      {user && !personalizationLoading && (!hasPersonalization || personalizedSections.length < 3) && <ChatCTA />}
+      {user && !personalizationLoading && (!hasPersonalization || personalizedSections.length < 3) && (
+        <ChatCTA />
+      )}
 
       {!user && <ChatCTA />}
 
-      {selectedMovie && <MovieDetailModal movie={selectedMovie} onClose={() => setSelectedMovie(null)} />}
+      {selectedMovie && (
+        <MovieDetailModal movie={selectedMovie} onClose={() => setSelectedMovie(null)} />
+      )}
     </div>
   );
 };
