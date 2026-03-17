@@ -4,7 +4,7 @@ import type { User, Session } from "@supabase/supabase-js";
 
 interface AuthContextType {
   user: User | null;
-  profile: any | null; // Consider defining a more specific type for profile
+  profile: any | null;
   session: Session | null;
   loading: boolean;
   signOut: () => Promise<void>;
@@ -33,11 +33,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const fetchProfile = async (userId: string) => {
     try {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", userId) // Assuming 'id' is the primary key for profiles, not 'user_id'
-        .maybeSingle();
+      const { data, error } = await supabase.from("profiles").select("*").eq("user_id", userId).maybeSingle();
 
       if (error) throw error;
       if (data) {
@@ -84,7 +80,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     profile,
     loading,
     signOut,
-    refreshProfile: async () => user && (await fetchProfile(user.id)),
+    refreshProfile: async () => {
+      if (user) await fetchProfile(user.id);
+    },
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
