@@ -9,9 +9,7 @@ const navItems = [
   { to: "/profile", icon: User, label: "Perfil" },
 ];
 
-const BottomNav = ({ hide }: { hide?: boolean }) => {
-  if (hide) return null;
-
+const BottomNav = () => {
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 glass-surface-strong border-t border-border/50">
       <div className="flex items-center justify-around h-16 max-w-lg mx-auto px-4">

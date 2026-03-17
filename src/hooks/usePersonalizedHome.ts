@@ -31,7 +31,7 @@ function buildPosterUrl(movie: any): string {
 }
 
 export function usePersonalizedHome() {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const [personalizedSections, setPersonalizedSections] = useState<PersonalizedSection[]>([]);
   const [tasteSummary, setTasteSummary] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -103,12 +103,10 @@ export function usePersonalizedHome() {
     }
   }, [user, hasPersonalization]);
 
-  // Initial fetch and fetch when taste_bio changes
+  // Initial fetch
   useEffect(() => {
-    if (user) {
-      fetchPersonalization(!!profile?.taste_bio);
-    }
-  }, [user, profile?.taste_bio]);
+    fetchPersonalization();
+  }, [user]);
 
   // Retry only if no personalization yet (max once per 30s)
   useEffect(() => {

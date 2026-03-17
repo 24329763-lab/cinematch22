@@ -483,6 +483,85 @@ const ProfilePage = () => {
           )}
         </div>
 
+        {/* Taste Profile Card */}
+        <div className="glass-surface rounded-2xl p-5 mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Sparkles size={16} className="text-cinema-gold" />
+              <h3 className="text-sm font-bold">Meu Perfil de Gosto</h3>
+            </div>
+            {!editingBio && (
+              <button onClick={() => setEditingBio(true)} className="p-1.5 rounded-lg glass text-muted-foreground hover:text-foreground transition-all">
+                <Pencil size={12} />
+              </button>
+            )}
+          </div>
+
+          {editingBio ? (
+            <div className="space-y-3">
+              <textarea
+                value={tasteBio}
+                onChange={(e) => setTasteBio(e.target.value)}
+                placeholder="Descreva o que você curte: gêneros, moods, diretores, o que te irrita em filmes... Isso ajuda nas recomendações!"
+                rows={4}
+                maxLength={500}
+                className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none px-4 py-3 rounded-xl glass focus:ring-1 focus:ring-primary/50 resize-none leading-relaxed"
+              />
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-muted-foreground">{tasteBio.length}/500</span>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => { setEditingBio(false); setTasteBio((profile as any)?.taste_bio || ""); }}
+                    className="px-3 py-1.5 rounded-lg glass text-muted-foreground text-xs font-semibold hover:text-foreground"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={saveTasteBio}
+                    disabled={savingBio}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg gradient-primary text-primary-foreground text-xs font-bold disabled:opacity-30"
+                  >
+                    {savingBio ? <Loader2 size={10} className="animate-spin" /> : <Check size={10} />}
+                    Salvar
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div>
+              {tasteBio ? (
+                <p className="text-sm text-foreground/80 leading-relaxed">{tasteBio}</p>
+              ) : tasteSummary ? (
+                <p className="text-sm text-foreground/80 leading-relaxed italic">{tasteSummary}</p>
+              ) : (
+                <button
+                  onClick={() => setEditingBio(true)}
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Toque para descrever seu gosto em filmes — isso melhora suas recomendações ✨
+                </button>
+              )}
+              {tasteBio && (
+                <p className="text-[10px] text-muted-foreground mt-2 flex items-center gap-1">
+                  <MessageCircle size={10} /> Converse no chat para refinar seu perfil
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* AI-generated taste summary */}
+        {tasteSummary && tasteBio && (
+          <div className="glass rounded-2xl p-4 mb-6 flex items-start gap-3">
+            <div className="w-7 h-7 rounded-lg gradient-primary flex items-center justify-center flex-shrink-0">
+              <Sparkles size={12} className="text-primary-foreground" />
+            </div>
+            <div>
+              <span className="text-[10px] font-bold gradient-text uppercase tracking-wider">O que o CineMatch entende</span>
+              <p className="text-xs text-foreground/70 mt-0.5 leading-relaxed">{tasteSummary}</p>
+            </div>
+          </div>
+        )}
 
         {/* Friend code */}
         {friendCode && (
@@ -655,79 +734,6 @@ const ProfilePage = () => {
             </div>
           </div>
         )}
-
-        {/* Taste Profile Card (Moved below connections) */}
-        <div className="glass-surface rounded-2xl p-5 mb-6">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <Sparkles size={16} className="text-cinema-gold" />
-              <h3 className="text-sm font-bold">Meu Perfil de Gosto</h3>
-            </div>
-            {!editingBio && (
-              <button onClick={() => setEditingBio(true)} className="p-1.5 rounded-lg glass text-muted-foreground hover:text-foreground transition-all">
-                <Pencil size={12} />
-              </button>
-            )}
-          </div>
-
-          {editingBio ? (
-            <div className="space-y-3">
-              <textarea
-                value={tasteBio}
-                onChange={(e) => setTasteBio(e.target.value)}
-                placeholder="Descreva o que você curte: gêneros, moods, diretores, o que te irrita em filmes... Isso ajuda nas recomendações!"
-                rows={4}
-                maxLength={500}
-                className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none px-4 py-3 rounded-xl glass focus:ring-1 focus:ring-primary/50 resize-none leading-relaxed"
-              />
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] text-muted-foreground">{tasteBio.length}/500</span>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => { setEditingBio(false); setTasteBio((profile as any)?.taste_bio || ""); }}
-                    className="px-3 py-1.5 rounded-lg glass text-muted-foreground text-xs font-semibold hover:text-foreground"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    onClick={saveTasteBio}
-                    disabled={savingBio}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg gradient-primary text-primary-foreground text-xs font-bold disabled:opacity-30"
-                  >
-                    {savingBio ? <Loader2 size={10} className="animate-spin" /> : <Check size={10} />}
-                    Salvar
-                  </button>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div>
-              {tasteBio ? (
-                <p className="text-sm text-foreground/80 leading-relaxed">{tasteBio}</p>
-              ) : tasteSummary ? (
-                <p className="text-sm text-foreground/80 leading-relaxed italic">{tasteSummary}</p>
-              ) : (
-                <button
-                  onClick={() => setEditingBio(true)}
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Toque para descrever seu gosto em filmes — isso melhora suas recomendações ✨
-                </button>
-              )}
-              {tasteSummary && tasteBio && (
-                <div className="mt-4 pt-4 border-t border-white/5">
-                  <span className="text-[10px] font-bold gradient-text uppercase tracking-wider block mb-1">O que o CineMatch entende</span>
-                  <p className="text-xs text-foreground/70 leading-relaxed">{tasteSummary}</p>
-                </div>
-              )}
-              {tasteBio && (
-                <p className="text-[10px] text-muted-foreground mt-3 flex items-center gap-1">
-                  <MessageCircle size={10} /> Converse no chat para refinar seu perfil
-                </p>
-              )}
-            </div>
-          )}
-        </div>
 
         {/* Logout */}
         <button
