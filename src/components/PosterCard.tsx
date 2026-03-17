@@ -15,8 +15,10 @@ const platformBadge: Record<Platform, { label: string; bg: string }> = {
   disney: { label: "D+", bg: "bg-cinema-blue" },
 };
 
-const slugify = (t: string) =>
-  t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+const slugify = (t: string) => {
+  if (!t) return "movie";
+  return t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+};
 
 const PosterCard = ({
   movie,
