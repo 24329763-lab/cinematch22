@@ -1,21 +1,89 @@
 import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
+import {
+  Sparkles,
+  Heart,
+  Star,
+  Compass,
+  Flame,
+  TrendingUp,
+  Clock,
+  Globe,
+  Loader2,
+  MessageCircle,
+  Users,
+} from "lucide-react";
+import PosterCard from "@/components/PosterCard"; // Corrected import
+import MovieDetailModal from "@/components/MovieDetailModal"; // Corrected import
+import HorizontalScroll from "@/components/HorizontalScroll"; // Corrected import
+import HeroCarousel from "@/components/HeroCarousel"; // Corrected import
 import { useAuth } from "@/hooks/useAuth";
 import { usePersonalizedHome } from "@/hooks/usePersonalizedHome";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { HeroCarousel } from "@/components/HeroCarousel";
-import { HorizontalScroll } from "@/components/HorizontalScroll";
-import { PosterCard } from "@/components/PosterCard";
-import { SectionHeader } from "@/components/SectionHeader";
-import { MovieDetailModal } from "@/components/MovieDetailModal";
-import { ChatCTA } from "@/components/ChatCTA";
-import { Loader2 } from "lucide-react";
-import { Heart, Users, Flame, Compass, Star } from "lucide-react";
+import type { MoviePoster } from "@/lib/tmdb";
 
-const ICON_MAP: { [key: string]: any } = {
+const ICON_MAP: Record<string, React.ElementType> = {
   heart: Heart,
   flame: Flame,
   compass: Compass,
   star: Star,
+  trending: TrendingUp,
+  clock: Clock,
+  globe: Globe,
+  sparkles: Sparkles,
+};
+
+// Re-integrated SectionHeader component
+const SectionHeader = ({
+  icon: Icon,
+  title,
+  subtitle,
+}: {
+  icon: React.ElementType;
+  title: string;
+  subtitle?: string;
+}) => (
+  <div className="px-5 mb-4 flex items-center justify-between">
+    <div className="flex items-center gap-2.5">
+      <div className="w-7 h-7 rounded-lg gradient-primary flex items-center justify-center">
+        <Icon size={14} className="text-primary-foreground" />
+      </div>
+      <div>
+        <h2 className="text-base font-bold text-foreground tracking-display">{title}</h2>
+        {subtitle && <span className="text-[11px] text-muted-foreground">{subtitle}</span>}
+      </div>
+    </div>
+  </div>
+);
+
+// Re-integrated ChatCTA component
+const ChatCTA = () => {
+  const navigate = useNavigate();
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="mx-5 mt-10 mb-4 glass-surface rounded-2xl p-6 text-center"
+    >
+      <div className="w-12 h-12 rounded-2xl gradient-primary flex items-center justify-center mx-auto mb-4 cinema-glow-sm">
+        <MessageCircle size={20} className="text-primary-foreground" />
+      </div>
+      <h3 className="text-lg font-bold text-foreground mb-2">Sua home pode ser muito melhor</h3>
+      <p className="text-sm text-muted-foreground leading-relaxed mb-4 max-w-sm mx-auto">
+        Converse com o chat sobre seus filmes favoritos, o que você curte e o que não curte — quanto mais eu souber,
+        melhor fica sua home.
+      </p>
+      <button
+        onClick={() => navigate("/chat")}
+        className="gradient-primary text-primary-foreground px-6 py-3 rounded-full text-sm font-bold cinema-glow-sm hover:opacity-90 transition-opacity"
+      >
+        <span className="flex items-center gap-2">
+          <Sparkles size={14} /> Conversar agora
+        </span>
+      </button>
+    </motion.div>
+  );
 };
 
 interface Movie {
@@ -37,7 +105,7 @@ interface FriendWatchlist {
 }
 
 const HomePage = () => {
-  const { user, profile } = useAuth();
+  const { user, profile } = useAuth(); // Added profile here
   const { personalizedSections, isLoading: personalizationLoading, hasPersonalization } = usePersonalizedHome();
   const [selectedMovie, setSelectedMovie] = useState<Movie | null>(null);
   const [watchlistItems, setWatchlistItems] = useState<Movie[]>([]);
@@ -50,6 +118,7 @@ const HomePage = () => {
         setWatchlistItems([]);
         return;
       }
+      // NOTE: This assumes 'user_watchlist' table exists and is correctly typed in Supabase types.ts
       const { data, error } = await supabase
         .from("user_watchlist") // Use the new user_watchlist table
         .select("movie_id, added_at")
@@ -92,6 +161,7 @@ const HomePage = () => {
 
       if (friendIds.length === 0) return;
 
+      // NOTE: This assumes 'profiles' and 'user_watchlist' tables are correctly typed
       const [profilesRes, ...watchlistResults] = await Promise.all([
         supabase.from("profiles").select("id, nickname, display_name").in("id", friendIds),
         ...friendIds.map((fid: string) =>
