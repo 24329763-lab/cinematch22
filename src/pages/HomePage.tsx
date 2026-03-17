@@ -207,7 +207,7 @@ const HomePage = () => {
       {user && personalizationLoading && (
         <div className="flex items-center justify-center gap-2 mt-8 text-muted-foreground">
           <Loader2 size={16} className="animate-spin" />
-          <span className="text-xs">Identificando seu gosto...</span>
+          <span className="text-xs">Calculando seu gosto... ✨</span>
         </div>
       )}
 
@@ -255,8 +255,8 @@ const HomePage = () => {
           );
         })}
 
-      {/* FALLBACK: Static Sections (If Edge function is missing or errored or not user) */}
-      {!hasPersonalization && !personalizationLoading && (
+      {/* FALLBACK: Static Sections (visible while personalization loads or if no personalization) */}
+      {!hasPersonalization && (
         <>
           <section className={watchlistItems.length === 0 ? "mt-8" : "mt-10"}>
             <SectionHeader icon={Flame} title="Em Alta" subtitle="O que do Brasil está bombando" />
