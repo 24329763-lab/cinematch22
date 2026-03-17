@@ -1,18 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import {
-  Sparkles,
-  Heart,
-  Star,
-  Compass,
-  Flame,
-  TrendingUp,
-  Clock,
-  Globe,
-  Loader2,
-  MessageCircle,
-  Users,
-} from "lucide-react";
+import { Sparkles, Heart, Star, Compass, Flame, TrendingUp, Clock, Globe, Loader2, MessageCircle, Users } from "lucide-react";
 import PosterCard from "@/components/PosterCard";
 import MovieDetailModal from "@/components/MovieDetailModal";
 import HorizontalScroll from "@/components/HorizontalScroll";
@@ -21,7 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { usePersonalizedHome } from "@/hooks/usePersonalizedHome";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { TRENDING, FOR_YOU, LEAVING_SOON, NEW_RELEASES, NETFLIX_ORIGINALS, type MoviePoster } from "@/lib/tmdb";
+import type { MoviePoster } from "@/lib/tmdb";
 
 const ICON_MAP: Record<string, React.ElementType> = {
   heart: Heart,
@@ -34,15 +22,7 @@ const ICON_MAP: Record<string, React.ElementType> = {
   sparkles: Sparkles,
 };
 
-const SectionHeader = ({
-  icon: Icon,
-  title,
-  subtitle,
-}: {
-  icon: React.ElementType;
-  title: string;
-  subtitle?: string;
-}) => (
+const SectionHeader = ({ icon: Icon, title, subtitle }: { icon: React.ElementType; title: string; subtitle?: string }) => (
   <div className="px-5 mb-4 flex items-center justify-between">
     <div className="flex items-center gap-2.5">
       <div className="w-7 h-7 rounded-lg gradient-primary flex items-center justify-center">
@@ -69,8 +49,7 @@ const ChatCTA = () => {
       </div>
       <h3 className="text-lg font-bold text-foreground mb-2">Sua home pode ser muito melhor</h3>
       <p className="text-sm text-muted-foreground leading-relaxed mb-4 max-w-sm mx-auto">
-        Converse com o chat sobre seus filmes favoritos, o que você curte e o que não curte — quanto mais eu souber,
-        melhor fica sua home.
+        Converse com o chat sobre seus filmes favoritos, o que você curte e o que não curte — quanto mais eu souber, melhor fica sua home.
       </p>
       <button
         onClick={() => navigate("/chat")}
@@ -92,12 +71,7 @@ interface FriendWatchlist {
 
 const HomePage = () => {
   const { user } = useAuth();
-  const {
-    personalizedSections,
-    tasteSummary,
-    isLoading: personalizationLoading,
-    hasPersonalization,
-  } = usePersonalizedHome();
+  const { personalizedSections, tasteSummary, isLoading: personalizationLoading, hasPersonalization } = usePersonalizedHome();
   const [selectedMovie, setSelectedMovie] = useState<MoviePoster | null>(null);
   const [watchlistItems, setWatchlistItems] = useState<MoviePoster[]>([]);
   const [friendRows, setFriendRows] = useState<FriendWatchlist[]>([]);
@@ -123,7 +97,7 @@ const HomePage = () => {
               platforms: (item.platforms || []) as ("netflix" | "prime" | "disney")[],
               genres: item.genres || [],
               description: "",
-            })),
+            }))
           );
         }
       });
@@ -141,18 +115,15 @@ const HomePage = () => {
 
       if (!invites || invites.length === 0) return;
 
-      const friendIds = invites.map((i: any) => (i.sender_id === user.id ? i.receiver_id : i.sender_id));
+      const friendIds = invites.map((i: any) =>
+        i.sender_id === user.id ? i.receiver_id : i.sender_id
+      );
 
       // Get profiles and watchlists in parallel
       const [profilesRes, ...watchlistResults] = await Promise.all([
         supabase.from("profiles").select("user_id, display_name, nickname").in("user_id", friendIds),
         ...friendIds.map((fid: string) =>
-          supabase
-            .from("watchlist")
-            .select("movie_id, title, year, rating, poster_url, platforms, genres")
-            .eq("user_id", fid)
-            .order("added_at", { ascending: false })
-            .limit(15),
+          supabase.from("watchlist").select("movie_id, title, year, rating, poster_url, platforms, genres").eq("user_id", fid).order("added_at", { ascending: false }).limit(15)
         ),
       ]);
 
@@ -188,18 +159,9 @@ const HomePage = () => {
   return (
     <div className="min-h-[calc(100dvh-4rem)] overflow-y-auto pb-24 relative">
       <div className="fixed inset-0 pointer-events-none -z-10 overflow-hidden">
-        <div
-          className="absolute top-[-10%] left-[-5%] w-[50%] h-[50%] rounded-full blur-[200px] opacity-20"
-          style={{ background: "hsl(280, 70%, 50%)" }}
-        />
-        <div
-          className="absolute top-[10%] right-[-10%] w-[45%] h-[45%] rounded-full blur-[200px] opacity-15"
-          style={{ background: "hsl(330, 80%, 55%)" }}
-        />
-        <div
-          className="absolute bottom-[5%] left-[20%] w-[40%] h-[35%] rounded-full blur-[180px] opacity-10"
-          style={{ background: "hsl(260, 60%, 45%)" }}
-        />
+        <div className="absolute top-[-10%] left-[-5%] w-[50%] h-[50%] rounded-full blur-[200px] opacity-20" style={{ background: "hsl(280, 70%, 50%)" }} />
+        <div className="absolute top-[10%] right-[-10%] w-[45%] h-[45%] rounded-full blur-[200px] opacity-15" style={{ background: "hsl(330, 80%, 55%)" }} />
+        <div className="absolute bottom-[5%] left-[20%] w-[40%] h-[35%] rounded-full blur-[180px] opacity-10" style={{ background: "hsl(260, 60%, 45%)" }} />
       </div>
 
       <HeroCarousel personalizedSections={personalizedSections} hasPersonalization={hasPersonalization} />
@@ -207,7 +169,7 @@ const HomePage = () => {
       {user && personalizationLoading && (
         <div className="flex items-center justify-center gap-2 mt-8 text-muted-foreground">
           <Loader2 size={16} className="animate-spin" />
-          <span className="text-xs">Calculando seu gosto... ✨</span>
+          <span className="text-xs">Personalizando sua experiência...</span>
         </div>
       )}
 
@@ -239,62 +201,20 @@ const HomePage = () => {
         </section>
       )}
 
-      {/* Personalized sections (If Edge Function succeeds) */}
-      {hasPersonalization &&
-        personalizedSections.map((section, sIdx) => {
-          const IconComp = ICON_MAP[section.icon] || Heart;
-          return (
-            <section key={section.key} className={sIdx === 0 && watchlistItems.length === 0 ? "mt-8" : "mt-10"}>
-              <SectionHeader icon={IconComp} title={section.title} subtitle={section.subtitle} />
-              <HorizontalScroll>
-                {section.movies.map((movie, i) => (
-                  <PosterCard key={movie.id} movie={movie} index={i} onSelect={setSelectedMovie} />
-                ))}
-              </HorizontalScroll>
-            </section>
-          );
-        })}
-
-      {/* FALLBACK: Static Sections (visible while personalization loads or if no personalization) */}
-      {!hasPersonalization && (
-        <>
-          <section className={watchlistItems.length === 0 ? "mt-8" : "mt-10"}>
-            <SectionHeader icon={Flame} title="Em Alta" subtitle="O que do Brasil está bombando" />
+      {/* Personalized sections */}
+      {hasPersonalization && personalizedSections.map((section, sIdx) => {
+        const IconComp = ICON_MAP[section.icon] || Heart;
+        return (
+          <section key={section.key} className={sIdx === 0 && watchlistItems.length === 0 ? "mt-8" : "mt-10"}>
+            <SectionHeader icon={IconComp} title={section.title} subtitle={section.subtitle} />
             <HorizontalScroll>
-              {TRENDING.map((movie, i) => (
+              {section.movies.map((movie, i) => (
                 <PosterCard key={movie.id} movie={movie} index={i} onSelect={setSelectedMovie} />
               ))}
             </HorizontalScroll>
           </section>
-
-          <section className="mt-10">
-            <SectionHeader icon={Compass} title="Para Você" subtitle="Baseado no que você curte" />
-            <HorizontalScroll>
-              {FOR_YOU.map((movie, i) => (
-                <PosterCard key={movie.id} movie={movie} index={i} onSelect={setSelectedMovie} />
-              ))}
-            </HorizontalScroll>
-          </section>
-
-          <section className="mt-10">
-            <SectionHeader icon={Star} title="Originais Netflix" subtitle="Obras aclamadas" />
-            <HorizontalScroll>
-              {NETFLIX_ORIGINALS.map((movie, i) => (
-                <PosterCard key={movie.id} movie={movie} index={i} onSelect={setSelectedMovie} />
-              ))}
-            </HorizontalScroll>
-          </section>
-
-          <section className="mt-10">
-            <SectionHeader icon={Clock} title="Saindo do Catálogo" subtitle="Última chance de assistir" />
-            <HorizontalScroll>
-              {LEAVING_SOON.map((movie, i) => (
-                <PosterCard key={movie.id} movie={movie} index={i} onSelect={setSelectedMovie} />
-              ))}
-            </HorizontalScroll>
-          </section>
-        </>
-      )}
+        );
+      })}
 
       {/* Friend rows */}
       {friendRows.map((fr) => (
@@ -309,11 +229,15 @@ const HomePage = () => {
       ))}
 
       {/* Chat CTA when not enough personalized content */}
-      {user && !personalizationLoading && (!hasPersonalization || personalizedSections.length < 3) && <ChatCTA />}
+      {user && !personalizationLoading && (!hasPersonalization || personalizedSections.length < 3) && (
+        <ChatCTA />
+      )}
 
       {!user && <ChatCTA />}
 
-      {selectedMovie && <MovieDetailModal movie={selectedMovie} onClose={() => setSelectedMovie(null)} />}
+      {selectedMovie && (
+        <MovieDetailModal movie={selectedMovie} onClose={() => setSelectedMovie(null)} />
+      )}
     </div>
   );
 };

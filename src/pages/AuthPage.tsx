@@ -1,10 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { Mail, Sparkles, Eye, EyeOff } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 import { lovable } from "@/integrations/lovable/index";
+import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/useAuth";
 
 const AuthPage = () => {
   const [mode, setMode] = useState<"login" | "signup">("login");
@@ -13,30 +12,16 @@ const AuthPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
-  const navigate = useNavigate();
-  const { user, loading: authLoading } = useAuth();
-
-  // Redirect if already logged in
-  useEffect(() => {
-    if (user && !authLoading) navigate("/");
-  }, [user, authLoading, navigate]);
 
   const handleGoogle = async () => {
     setLoading(true);
-    try {
-      const { error } = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: window.location.origin,
-      });
-      if (error) {
-        toast({ variant: "destructive", title: "Erro", description: String(error) });
-        setLoading(false);
-      }
-      // Note: If redirected, the page will reload/navigate away, so setLoading(false) isn't strictly needed
-      // but if the popup fails or doesn't trigger a redirect, we need to reset state.
-    } catch (err: any) {
-      toast({ variant: "destructive", title: "Erro inesperado", description: err.message });
-      setLoading(false);
+    const { error } = await lovable.auth.signInWithOAuth("google", {
+      redirect_uri: window.location.origin,
+    });
+    if (error) {
+      toast({ variant: "destructive", title: "Erro", description: String(error) });
     }
+    setLoading(false);
   };
 
   const handleEmail = async (e: React.FormEvent) => {
@@ -44,7 +29,7 @@ const AuthPage = () => {
     setLoading(true);
     try {
       if (mode === "signup") {
-        const { error } = await lovable.auth.signUp({
+        const { error } = await supabase.auth.signUp({
           email,
           password,
           options: { emailRedirectTo: window.location.origin },
@@ -52,7 +37,7 @@ const AuthPage = () => {
         if (error) throw error;
         toast({ title: "Verifique seu email", description: "Enviamos um link de confirmação." });
       } else {
-        const { error } = await lovable.auth.signInWithPassword({ email, password });
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
       }
     } catch (err: any) {

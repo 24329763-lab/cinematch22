@@ -1,6 +1,5 @@
-import { useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -14,37 +13,17 @@ import WatchlistPage from "@/pages/WatchlistPage";
 import WatchedPage from "@/pages/WatchedPage";
 import MoviePage from "@/pages/MoviePage";
 import PartyPage from "@/pages/PartyPage";
-import OnboardingPage from "@/pages/OnboardingPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
 const AppContent = () => {
-  const { user, profile, loading } = useAuth();
-  const navigate = useNavigate();
-  const { pathname } = useLocation();
-
-  useEffect(() => {
-    if (loading) return;
-    
-    const isAuthPage = pathname === "/auth";
-    const isOnboardingPage = pathname === "/onboarding";
-
-    if (user && profile && !profile.onboarding_complete) {
-      if (!isOnboardingPage) {
-        navigate("/onboarding");
-      }
-    } else if (!user && !isAuthPage && pathname !== "/") {
-      // Optional: Redirect to auth if trying to access private routes
-      // navigate("/auth");
-    }
-  }, [user, profile, loading, pathname, navigate]);
+  const { user, loading } = useAuth();
 
   return (
     <div className="dark min-h-dvh bg-background text-foreground">
       <Routes>
         <Route path="/auth" element={<AuthPage />} />
-        <Route path="/onboarding" element={<OnboardingPage />} />
         <Route path="/" element={<HomePage />} />
         <Route path="/chat" element={<ChatPage />} />
         <Route path="/profile" element={<ProfilePage />} />

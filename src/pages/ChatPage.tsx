@@ -1,27 +1,13 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  Send,
-  Sparkles,
-  Menu,
-  ThumbsUp,
-  ThumbsDown,
-  Share2,
-  ChevronLeft,
-  ChevronRight,
-  MessageCircle,
-  Film,
-} from "lucide-react";
+import { Send, Sparkles, Menu, ThumbsUp, ThumbsDown, Share2, ChevronLeft, ChevronRight, MessageCircle, Film } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { streamChat } from "@/lib/chat-stream";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import ChatSidebar, { type Conversation } from "@/components/ChatSidebar";
-import MovieRecommendationCard, {
-  parseMovieRecommendations,
-  type MovieRec,
-} from "@/components/MovieRecommendationCard";
+import MovieRecommendationCard, { parseMovieRecommendations, type MovieRec } from "@/components/MovieRecommendationCard";
 import MovieDetailModal from "@/components/MovieDetailModal";
 import type { MoviePoster } from "@/lib/tmdb";
 
@@ -59,13 +45,7 @@ function movieRecToMoviePoster(movie: MovieRec, posterUrl: string): MoviePoster 
   };
 }
 
-const ChatMovieScroll = ({
-  movies,
-  onOpenDetail,
-}: {
-  movies: MovieRec[];
-  onOpenDetail: (movie: MovieRec, posterUrl: string) => void;
-}) => {
+const ChatMovieScroll = ({ movies, onOpenDetail }: { movies: MovieRec[]; onOpenDetail: (movie: MovieRec, posterUrl: string) => void }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const scroll = (dir: "left" | "right") => {
@@ -119,10 +99,7 @@ const ChatPage = () => {
   const [selectedMovie, setSelectedMovie] = useState<MoviePoster | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
-
-  // Single useAuth call
-  const { user, profile } = useAuth();
-  const isOnboarding = user && profile && !profile.onboarding_complete;
+  const { user } = useAuth();
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -130,71 +107,31 @@ const ChatPage = () => {
 
   useEffect(() => {
     if (!user) return;
-    supabase
-      .from("conversations")
-      .select("*")
-      .order("updated_at", { ascending: false })
-      .then(({ data }) => {
-        if (data) setConversations(data as Conversation[]);
-      });
+    supabase.from("conversations").select("*").order("updated_at", { ascending: false })
+      .then(({ data }) => { if (data) setConversations(data as Conversation[]); });
   }, [user]);
 
   useEffect(() => {
-    if (!activeConvId) {
-      setMessages([]);
-      return;
-    }
-    supabase
-      .from("chat_messages")
-      .select("*")
-      .eq("conversation_id", activeConvId)
+    if (!activeConvId) { setMessages([]); return; }
+    supabase.from("chat_messages").select("*").eq("conversation_id", activeConvId)
       .order("created_at", { ascending: true })
       .then(({ data }) => {
-        if (data)
-          setMessages(
-            data.map((m: any) => ({ id: m.id, role: m.role, content: m.content, liked: m.liked, dbId: m.id })),
-          );
+        if (data) setMessages(data.map((m: any) => ({ id: m.id, role: m.role, content: m.content, liked: m.liked, dbId: m.id })));
       });
   }, [activeConvId]);
 
   const createConversation = async (title: string): Promise<string | null> => {
     if (!user) return null;
-    const { data, error } = await supabase
-      .from("conversations")
-      .insert({ user_id: user.id, title })
-      .select("id")
-      .single();
+    const { data, error } = await supabase.from("conversations").insert({ user_id: user.id, title }).select("id").single();
     if (error || !data) return null;
-    setConversations((prev) => [
-      { id: data.id, title, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-      ...prev,
-    ]);
+    setConversations((prev) => [{ id: data.id, title, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }, ...prev]);
     return data.id;
   };
 
   const saveMessage = async (convId: string, role: string, content: string) => {
-    const { data } = await supabase
-      .from("chat_messages")
-      .insert({ conversation_id: convId, role, content })
-      .select("id")
-      .single();
+    const { data } = await supabase.from("chat_messages").insert({ conversation_id: convId, role, content }).select("id").single();
     await supabase.from("conversations").update({ updated_at: new Date().toISOString() }).eq("id", convId);
     return data?.id;
-  };
-
-  const handleNewConversation = () => {
-    setActiveConvId(null);
-    setMessages([]);
-  };
-
-  const handleDeleteConversation = async (id: string) => {
-    await supabase.from("conversations").delete().eq("id", id);
-    setConversations((prev) => prev.filter((c) => c.id !== id));
-    if (activeConvId === id) handleNewConversation();
-  };
-
-  const handleOpenMovieDetail = (movie: MovieRec, posterUrl: string) => {
-    setSelectedMovie(movieRecToMoviePoster(movie, posterUrl));
   };
 
   const handleSend = async (text?: string) => {
@@ -207,13 +144,11 @@ const ChatPage = () => {
     setIsLoading(true);
 
     let convId = activeConvId;
-    if (!convId && user && !isOnboarding) {
+    if (!convId && user) {
       convId = await createConversation(messageText.length > 40 ? messageText.slice(0, 40) + "..." : messageText);
       setActiveConvId(convId);
     }
-    if (convId && !isOnboarding) {
-      await saveMessage(convId, "user", messageText);
-    }
+    if (convId) await saveMessage(convId, "user", messageText);
 
     let assistantSoFar = "";
     const allMessages = [...messages, userMsg];
@@ -223,7 +158,7 @@ const ChatPage = () => {
       setMessages((prev) => {
         const last = prev[prev.length - 1];
         if (last?.role === "assistant" && last.id === "streaming") {
-          return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: assistantSoFar } : m));
+          return prev.map((m, i) => i === prev.length - 1 ? { ...m, content: assistantSoFar } : m);
         }
         return [...prev, { id: "streaming", role: "assistant", content: assistantSoFar }];
       });
@@ -232,22 +167,12 @@ const ChatPage = () => {
     try {
       await streamChat({
         messages: allMessages.map((m) => ({ role: m.role, content: m.content })),
-        endpoint: isOnboarding ? "onboarding_chat" : "chat",
         onDelta: upsertAssistant,
         onDone: async () => {
           let dbId: string | undefined;
-          if (convId && !isOnboarding) {
-            dbId = await saveMessage(convId, "assistant", assistantSoFar);
-          }
-          setMessages((prev) =>
-            prev.map((m) => (m.id === "streaming" ? { ...m, id: Date.now().toString(), dbId } : m)),
-          );
+          if (convId) dbId = await saveMessage(convId, "assistant", assistantSoFar);
+          setMessages((prev) => prev.map((m) => m.id === "streaming" ? { ...m, id: Date.now().toString(), dbId } : m));
           setIsLoading(false);
-
-          if (isOnboarding && assistantSoFar.includes("configurado")) {
-            toast({ title: "Perfil criado!", description: "Seu gosto foi salvo." });
-            setTimeout(() => window.location.reload(), 2000);
-          }
         },
         onError: (error) => {
           toast({ variant: "destructive", title: "Erro", description: error });
@@ -264,7 +189,7 @@ const ChatPage = () => {
     if (!msg.dbId) return;
     const newLiked = msg.liked === liked ? null : liked;
     await supabase.from("chat_messages").update({ liked: newLiked }).eq("id", msg.dbId);
-    setMessages((prev) => prev.map((m) => (m.dbId === msg.dbId ? { ...m, liked: newLiked } : m)));
+    setMessages((prev) => prev.map((m) => m.dbId === msg.dbId ? { ...m, liked: newLiked } : m));
   };
 
   const shareMessage = (msg: Message) => {
@@ -272,10 +197,22 @@ const ChatPage = () => {
     toast({ title: "Mensagem copiada!" });
   };
 
+  const handleNewConversation = () => { setActiveConvId(null); setMessages([]); };
+
+  const handleDeleteConversation = async (id: string) => {
+    await supabase.from("conversations").delete().eq("id", id);
+    setConversations((prev) => prev.filter((c) => c.id !== id));
+    if (activeConvId === id) handleNewConversation();
+  };
+
+  const handleOpenMovieDetail = (movie: MovieRec, posterUrl: string) => {
+    setSelectedMovie(movieRecToMoviePoster(movie, posterUrl));
+  };
+
   const renderAssistantMessage = (msg: Message) => {
     const movieRecs = msg.id !== "streaming" ? parseMovieRecommendations(msg.content) : [];
 
-    const lines = msg.content.split("\n").filter((l) => l.trim());
+    const lines = msg.content.split("\n").filter(l => l.trim());
     const lastLine = lines[lines.length - 1]?.trim() || "";
     const hasFollowUp = movieRecs.length > 0 && lastLine.includes("?") && !lastLine.startsWith("**");
 
@@ -313,22 +250,13 @@ const ChatPage = () => {
 
         {msg.id !== "streaming" && (
           <div className="flex items-center gap-1.5 pl-1">
-            <button
-              onClick={() => toggleLike(msg, true)}
-              className={`p-1.5 rounded-lg transition-all ${msg.liked === true ? "text-cinema-gold" : "text-muted-foreground hover:text-foreground"}`}
-            >
+            <button onClick={() => toggleLike(msg, true)} className={`p-1.5 rounded-lg transition-all ${msg.liked === true ? "text-cinema-gold" : "text-muted-foreground hover:text-foreground"}`}>
               <ThumbsUp size={14} />
             </button>
-            <button
-              onClick={() => toggleLike(msg, false)}
-              className={`p-1.5 rounded-lg transition-all ${msg.liked === false ? "text-destructive" : "text-muted-foreground hover:text-foreground"}`}
-            >
+            <button onClick={() => toggleLike(msg, false)} className={`p-1.5 rounded-lg transition-all ${msg.liked === false ? "text-destructive" : "text-muted-foreground hover:text-foreground"}`}>
               <ThumbsDown size={14} />
             </button>
-            <button
-              onClick={() => shareMessage(msg)}
-              className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground transition-all"
-            >
+            <button onClick={() => shareMessage(msg)} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground transition-all">
               <Share2 size={14} />
             </button>
           </div>
@@ -341,22 +269,11 @@ const ChatPage = () => {
 
   return (
     <div className="flex h-[calc(100dvh-4rem)]">
-      <ChatSidebar
-        conversations={conversations}
-        activeId={activeConvId}
-        onSelect={setActiveConvId}
-        onNew={handleNewConversation}
-        onDelete={handleDeleteConversation}
-        open={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
-      />
+      <ChatSidebar conversations={conversations} activeId={activeConvId} onSelect={setActiveConvId} onNew={handleNewConversation} onDelete={handleDeleteConversation} open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       <div className="flex-1 flex flex-col min-w-0">
         <div className="flex items-center gap-3 px-4 py-3 border-b border-border/30">
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="p-2 rounded-xl glass text-muted-foreground hover:text-foreground"
-          >
+          <button onClick={() => setSidebarOpen(true)} className="p-2 rounded-xl glass text-muted-foreground hover:text-foreground">
             <Menu size={18} />
           </button>
           <span className="text-sm font-semibold text-foreground truncate">
@@ -367,19 +284,11 @@ const ChatPage = () => {
         <div ref={scrollRef} className="flex-1 overflow-y-auto px-4">
           <AnimatePresence mode="wait">
             {isEmpty ? (
-              <motion.div
-                key="empty"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="flex flex-col items-center justify-center h-full text-center px-4"
-              >
-                <motion.div
-                  initial={{ scale: 0.8, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ delay: 0.1 }}
-                >
-                  <h2 className="text-4xl sm:text-5xl font-black tracking-display mb-4 text-foreground">CineMatch</h2>
+              <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col items-center justify-center h-full text-center px-4">
+                <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.1 }}>
+                  <h2 className="text-4xl sm:text-5xl font-black tracking-display mb-4 text-foreground">
+                    CineMatch
+                  </h2>
                   <p className="text-sm text-muted-foreground max-w-sm mx-auto leading-relaxed mb-1">
                     Seu assistente de cinema pessoal.
                   </p>
@@ -389,14 +298,7 @@ const ChatPage = () => {
                 </motion.div>
                 <div className="mt-12 flex flex-wrap justify-center gap-2 w-full max-w-lg">
                   {SUGGESTIONS.map((s, i) => (
-                    <motion.button
-                      key={s.text}
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.3 + i * 0.06 }}
-                      onClick={() => handleSend(s.text)}
-                      className="text-sm px-4 py-2.5 rounded-full glass text-foreground/60 hover:text-foreground/90 hover:bg-white/10 transition-all"
-                    >
+                    <motion.button key={s.text} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 + i * 0.06 }} onClick={() => handleSend(s.text)} className="text-sm px-4 py-2.5 rounded-full glass text-foreground/60 hover:text-foreground/90 hover:bg-white/10 transition-all">
                       {s.text}
                     </motion.button>
                   ))}
@@ -412,18 +314,12 @@ const ChatPage = () => {
                           {msg.content}
                         </div>
                       </div>
-                    ) : (
-                      renderAssistantMessage(msg)
-                    )}
+                    ) : renderAssistantMessage(msg)}
                   </motion.div>
                 ))}
 
                 {isLoading && messages[messages.length - 1]?.role !== "assistant" && (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="flex items-center gap-2.5 text-sm text-muted-foreground glass rounded-2xl px-4 py-3 w-fit"
-                  >
+                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-2.5 text-sm text-muted-foreground glass rounded-2xl px-4 py-3 w-fit">
                     <div className="flex gap-1.5">
                       <span className="w-2 h-2 rounded-full gradient-primary animate-pulse-glow" />
                       <span className="w-2 h-2 rounded-full gradient-primary animate-pulse-glow [animation-delay:0.2s]" />
@@ -440,18 +336,8 @@ const ChatPage = () => {
         <div className="p-4 pb-safe">
           <div className="max-w-2xl mx-auto">
             <div className="flex items-center gap-2 glass-surface rounded-2xl px-4 py-2 focus-within:ring-1 focus-within:ring-primary/50 transition-all">
-              <input
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleSend()}
-                placeholder="Peça filmes ou conte seu gosto..."
-                className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none py-2.5"
-              />
-              <button
-                onClick={() => handleSend()}
-                disabled={!input.trim() || isLoading}
-                className="p-2.5 rounded-xl gradient-primary text-primary-foreground disabled:opacity-30 transition-all hover:opacity-90 cinema-glow-sm"
-              >
+              <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleSend()} placeholder="Peça filmes ou conte seu gosto..." className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none py-2.5" />
+              <button onClick={() => handleSend()} disabled={!input.trim() || isLoading} className="p-2.5 rounded-xl gradient-primary text-primary-foreground disabled:opacity-30 transition-all hover:opacity-90 cinema-glow-sm">
                 <Send size={16} />
               </button>
             </div>
@@ -459,7 +345,9 @@ const ChatPage = () => {
         </div>
       </div>
 
-      {selectedMovie && <MovieDetailModal movie={selectedMovie} onClose={() => setSelectedMovie(null)} />}
+      {selectedMovie && (
+        <MovieDetailModal movie={selectedMovie} onClose={() => setSelectedMovie(null)} />
+      )}
     </div>
   );
 };

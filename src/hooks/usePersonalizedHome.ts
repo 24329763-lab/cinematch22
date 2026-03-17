@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { lovable } from "@/integrations/lovable/index";
+import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { MOVIE_POSTERS, type MoviePoster } from "@/lib/tmdb";
 
@@ -54,17 +54,26 @@ export function usePersonalizedHome() {
     inFlightRef.current = true;
     setIsLoading(true);
     try {
-      const { data, error } = await lovable.functions.invoke("personalize", {
-        body: {}
+      const { data: session } = await supabase.auth.getSession();
+      const token = session?.session?.access_token;
+      if (!token) return;
+
+      const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/personalize`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({}),
       });
 
-      if (error) throw error;
+      if (!resp.ok) throw new Error("Personalization failed");
 
-      const personalizedData: PersonalizedHome = data;
+      const data: PersonalizedHome = await resp.json();
       lastFetchRef.current = Date.now();
 
-      if (personalizedData.sections && personalizedData.sections.length > 0) {
-        const sections = personalizedData.sections.map((section) => ({
+      if (data.sections && data.sections.length > 0) {
+        const sections = data.sections.map((section) => ({
           ...section,
           movies: section.movies.map((m: any, i: number) => ({
             id: m.id || `p-${section.key}-${i}`,
@@ -80,7 +89,7 @@ export function usePersonalizedHome() {
         }));
 
         setPersonalizedSections(sections);
-        setTasteSummary(personalizedData.taste_summary);
+        setTasteSummary(data.taste_summary);
         setHasPersonalization(true);
       } else {
         setHasPersonalization(false);
