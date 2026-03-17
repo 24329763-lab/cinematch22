@@ -9,7 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { usePersonalizedHome } from "@/hooks/usePersonalizedHome";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import type { MoviePoster } from "@/lib/tmdb";
+import { TRENDING, FOR_YOU, LEAVING_SOON, NETFLIX_ORIGINALS, type MoviePoster } from "@/lib/tmdb";
 
 const ICON_MAP: Record<string, React.ElementType> = {
   heart: Heart,
@@ -76,7 +76,7 @@ const HomePage = () => {
   const [watchlistItems, setWatchlistItems] = useState<MoviePoster[]>([]);
   const [friendRows, setFriendRows] = useState<FriendWatchlist[]>([]);
 
-  // Fetch watchlist for "Minha Lista" row
+  // Fetch watchlist
   useEffect(() => {
     if (!user) return;
     supabase
@@ -119,7 +119,6 @@ const HomePage = () => {
         i.sender_id === user.id ? i.receiver_id : i.sender_id
       );
 
-      // Get profiles and watchlists in parallel
       const [profilesRes, ...watchlistResults] = await Promise.all([
         supabase.from("profiles").select("user_id, display_name, nickname").in("user_id", friendIds),
         ...friendIds.map((fid: string) =>
@@ -169,7 +168,7 @@ const HomePage = () => {
       {user && personalizationLoading && (
         <div className="flex items-center justify-center gap-2 mt-8 text-muted-foreground">
           <Loader2 size={16} className="animate-spin" />
-          <span className="text-xs">Personalizando sua experiência...</span>
+          <span className="text-xs">Identificando seu gosto...</span>
         </div>
       )}
 
@@ -189,7 +188,6 @@ const HomePage = () => {
         </motion.div>
       )}
 
-      {/* My List row */}
       {watchlistItems.length > 0 && (
         <section className="mt-8">
           <SectionHeader icon={Heart} title="Minha Lista" subtitle="Filmes que você salvou" />
@@ -216,7 +214,39 @@ const HomePage = () => {
         );
       })}
 
-      {/* Friend rows */}
+      {/* FALLBACK: Static Sections */}
+      {!hasPersonalization && !personalizationLoading && (
+        <>
+          <section className={watchlistItems.length === 0 ? "mt-8" : "mt-10"}>
+            <SectionHeader icon={Flame} title="Em Alta" subtitle="O que do Brasil está bombando" />
+            <HorizontalScroll>
+              {TRENDING.map((movie, i) => <PosterCard key={movie.id} movie={movie} index={i} onSelect={setSelectedMovie} />)}
+            </HorizontalScroll>
+          </section>
+
+          <section className="mt-10">
+            <SectionHeader icon={Compass} title="Para Você" subtitle="Baseado no que você curte" />
+            <HorizontalScroll>
+              {FOR_YOU.map((movie, i) => <PosterCard key={movie.id} movie={movie} index={i} onSelect={setSelectedMovie} />)}
+            </HorizontalScroll>
+          </section>
+
+          <section className="mt-10">
+            <SectionHeader icon={Star} title="Originais Netflix" subtitle="Obras aclamadas" />
+            <HorizontalScroll>
+              {NETFLIX_ORIGINALS.map((movie, i) => <PosterCard key={movie.id} movie={movie} index={i} onSelect={setSelectedMovie} />)}
+            </HorizontalScroll>
+          </section>
+          
+          <section className="mt-10">
+            <SectionHeader icon={Clock} title="Saindo do Catálogo" subtitle="Última chance de assistir" />
+            <HorizontalScroll>
+              {LEAVING_SOON.map((movie, i) => <PosterCard key={movie.id} movie={movie} index={i} onSelect={setSelectedMovie} />)}
+            </HorizontalScroll>
+          </section>
+        </>
+      )}
+
       {friendRows.map((fr) => (
         <section key={fr.friendId} className="mt-10">
           <SectionHeader icon={Users} title={`Favoritos de ${fr.friendName}`} subtitle="Da lista do seu amigo" />
@@ -226,9 +256,8 @@ const HomePage = () => {
             ))}
           </HorizontalScroll>
         </section>
-      ))}
+      )}
 
-      {/* Chat CTA when not enough personalized content */}
       {user && !personalizationLoading && (!hasPersonalization || personalizedSections.length < 3) && (
         <ChatCTA />
       )}
