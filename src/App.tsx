@@ -25,8 +25,18 @@ const AppContent = () => {
   const { pathname } = useLocation();
 
   useEffect(() => {
-    if (!loading && user && profile && !profile.onboarding_complete && pathname !== "/onboarding" && pathname !== "/auth") {
-      navigate("/onboarding");
+    if (loading) return;
+    
+    const isAuthPage = pathname === "/auth";
+    const isOnboardingPage = pathname === "/onboarding";
+
+    if (user && profile && !profile.onboarding_complete) {
+      if (!isOnboardingPage) {
+        navigate("/onboarding");
+      }
+    } else if (!user && !isAuthPage && pathname !== "/") {
+      // Optional: Redirect to auth if trying to access private routes
+      // navigate("/auth");
     }
   }, [user, profile, loading, pathname, navigate]);
 
