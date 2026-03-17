@@ -34,5 +34,10 @@ export const lovable = {
       }
       return result;
     },
+    signUp: (params: any) => supabase.auth.signUp(params),
+    signInWithPassword: (params: any) => supabase.auth.signInWithPassword(params),
+    signOut: () => supabase.auth.signOut(),
+    onAuthStateChange: (callback: any) => supabase.auth.onAuthStateChange(callback),
+    getSession: () => supabase.auth.getSession(),
   },
 };

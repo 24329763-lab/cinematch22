@@ -3,7 +3,6 @@ import { motion } from "framer-motion";
 import { Mail, Sparkles, Eye, EyeOff } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { lovable } from "@/integrations/lovable/index";
-import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -45,7 +44,7 @@ const AuthPage = () => {
     setLoading(true);
     try {
       if (mode === "signup") {
-        const { error } = await supabase.auth.signUp({
+        const { error } = await lovable.auth.signUp({
           email,
           password,
           options: { emailRedirectTo: window.location.origin },
@@ -53,7 +52,7 @@ const AuthPage = () => {
         if (error) throw error;
         toast({ title: "Verifique seu email", description: "Enviamos um link de confirmação." });
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        const { error } = await lovable.auth.signInWithPassword({ email, password });
         if (error) throw error;
       }
     } catch (err: any) {
