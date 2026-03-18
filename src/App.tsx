@@ -44,58 +44,56 @@ const OnboardingCheck = ({ children }: { children: React.ReactNode }) => {
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/auth" element={<AuthPage />} />
-            <Route path="/onboarding" element={<OnboardingPage />} />
+    <TooltipProvider>
+      <Toaster />
+      <Sonner />
+      <BrowserRouter>
+        <Routes>
+          <Route path="/auth" element={<AuthPage />} />
+          <Route path="/onboarding" element={<OnboardingPage />} />
 
-            <Route
-              path="/"
-              element={
-                <OnboardingCheck>
-                  <Index />
-                </OnboardingCheck>
-              }
-            />
+          <Route
+            path="/"
+            element={
+              <OnboardingCheck>
+                <Index />
+              </OnboardingCheck>
+            }
+          />
 
-            <Route
-              path="/chat"
-              element={
-                <ProtectedRoute>
-                  <ChatPage />
-                </ProtectedRoute>
-              }
-            />
+          <Route
+            path="/chat"
+            element={
+              <ProtectedRoute>
+                <ChatPage />
+              </ProtectedRoute>
+            }
+          />
 
-            <Route
-              path="/watchlist"
-              element={
-                <ProtectedRoute>
-                  <WatchlistPage />
-                </ProtectedRoute>
-              }
-            />
+          <Route
+            path="/watchlist"
+            element={
+              <ProtectedRoute>
+                <WatchlistPage />
+              </ProtectedRoute>
+            }
+          />
 
-            <Route
-              path="/profile"
-              element={
-                <ProtectedRoute>
-                  <ProfilePage />
-                </ProtectedRoute>
-              }
-            />
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <ProfilePage />
+              </ProtectedRoute>
+            }
+          />
 
-            <Route path="/movie/:slug" element={<MoviePage />} />
+          <Route path="/movie/:slug" element={<MoviePage />} />
 
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
-    </AuthProvider>
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </TooltipProvider>
   </QueryClientProvider>
 );
 
