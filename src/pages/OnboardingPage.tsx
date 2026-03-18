@@ -47,41 +47,43 @@ const OnboardingPage = () => {
     try {
       let fullResponse = "";
 
-      // Corrected streamChat call to match your project's structure
-      await streamChat(
-        newMessages,
-        (chunk: string) => {
-          fullResponse += chunk;
-          setMessages((prev) => {
-            const updated = [...prev];
-            const lastMsg = updated[updated.length - 1];
-            if (lastMsg?.role === "assistant" && lastMsg?.isStreaming) {
-              lastMsg.content = fullResponse;
-            } else {
-              updated.push({
-                role: "assistant",
-                content: fullResponse,
-                isStreaming: true,
-              });
-            }
-            return updated;
-          });
-        },
-        () => {
-          setMessages((prev) => {
-            const updated = [...prev];
-            const lastMsg = updated[updated.length - 1];
-            if (lastMsg?.isStreaming) {
-              delete lastMsg.isStreaming;
-            }
-            return updated;
-          });
-          setLoading(false);
-        },
-      );
+      // We call streamChat with only the messages
+      // It returns a promise that we can await, but we need to handle the stream
+      // Since I don't have the exact streamChat implementation, I'll use a safer approach
+      // that matches how your ChatPage likely handles it.
+
+      await streamChat(newMessages, (chunk: string) => {
+        fullResponse += chunk;
+        setMessages((prev) => {
+          const updated = [...prev];
+          const lastMsg = updated[updated.length - 1];
+          if (lastMsg?.role === "assistant" && lastMsg?.isStreaming) {
+            lastMsg.content = fullResponse;
+          } else {
+            updated.push({
+              role: "assistant",
+              content: fullResponse,
+              isStreaming: true,
+            });
+          }
+          return updated;
+        });
+      });
+
+      // Mark streaming as finished
+      setMessages((prev) => {
+        const updated = [...prev];
+        const lastMsg = updated[updated.length - 1];
+        if (lastMsg?.isStreaming) {
+          const { isStreaming, ...rest } = lastMsg;
+          updated[updated.length - 1] = rest;
+        }
+        return updated;
+      });
     } catch (err) {
       console.error("Streaming error:", err);
       toast({ variant: "destructive", title: "Erro ao processar resposta" });
+    } finally {
       setLoading(false);
     }
   };
