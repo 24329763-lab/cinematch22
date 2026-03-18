@@ -39,15 +39,18 @@ const OnboardingPage = () => {
     if (!input.trim() || loading) return;
 
     const userMsg = { role: "user", content: input };
-    setMessages((prev) => [...prev, userMsg]);
+    const newMessages = [...messages, userMsg];
+    setMessages(newMessages);
     setInput("");
     setLoading(true);
 
     try {
       let fullResponse = "";
+
+      // Corrected streamChat call to match your project's structure
       await streamChat(
-        [...messages, userMsg],
-        (chunk) => {
+        newMessages,
+        (chunk: string) => {
           fullResponse += chunk;
           setMessages((prev) => {
             const updated = [...prev];
