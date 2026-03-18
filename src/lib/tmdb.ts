@@ -15,7 +15,11 @@ export interface MoviePoster {
 const TMDB_BASE = "https://api.themoviedb.org/3";
 const IMG_BASE = "https://image.tmdb.org/t/p/w500";
 
-// Fallback data - used only when API fails
+// --- KEEPING THESE FOR COMPATIBILITY ---
+export const MOVIE_POSTERS: Record<string, string> = {
+  placeholder: "/placeholder.svg",
+};
+
 export const TRENDING: MoviePoster[] = [
   {
     id: "t1",
@@ -28,29 +32,13 @@ export const TRENDING: MoviePoster[] = [
     description:
       "Eunice Paiva reconstrói a vida após o desaparecimento do marido durante a ditadura militar brasileira.",
   },
-  {
-    id: "t2",
-    title: "Nosferatu",
-    year: 2024,
-    rating: 7.8,
-    posterUrl: "https://image.tmdb.org/t/p/w500/nosferatu.jpg",
-    platforms: ["prime"],
-    genres: ["Terror"],
-    description: "Reimaginação gótica do clássico vampiro.",
-  },
 ];
 
-export const FOR_YOU: MoviePoster[] = [
-  {
-    id: "f1",
-    title: "Cidade de Deus",
-    year: 2002,
-    rating: 8.6,
-    posterUrl: "https://image.tmdb.org/t/p/w500/cidade-de-deus.jpg",
-    platforms: ["netflix"],
-    genres: ["Crime", "Drama"],
-  },
-];
+export const FOR_YOU: MoviePoster[] = [...TRENDING];
+export const LEAVING_SOON: MoviePoster[] = [...TRENDING];
+export const NEW_RELEASES: MoviePoster[] = [...TRENDING];
+export const NETFLIX_ORIGINALS: MoviePoster[] = [...TRENDING];
+// ---------------------------------------
 
 // Dynamic TMDB fetching functions
 export async function fetchTrendingMovies(): Promise<MoviePoster[]> {
