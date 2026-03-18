@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { type MoviePoster } from "@/lib/tmdb";
+import { MOVIE_POSTERS, type MoviePoster } from "@/lib/tmdb";
 
 interface PersonalizedSection {
   key: string;
@@ -16,40 +16,18 @@ interface PersonalizedHome {
   taste_summary: string | null;
 }
 
-const CACHE_KEY = "cinematch_home_cache";
-const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+const POSTER_BASE = "https://image.tmdb.org/t/p/w500";
 
-interface CachedHome {
-  sections: PersonalizedSection[];
-  tasteSummary: string | null;
-  timestamp: number;
-  tasteBioHash: string;
-}
-
-function hashString(s: string): string {
-  let hash = 0;
-  for (let i = 0; i < s.length; i++) {
-    hash = ((hash << 5) - hash + s.charCodeAt(i)) | 0;
-  }
-  return String(hash);
-}
-
-function loadCache(userId: string): CachedHome | null {
-  try {
-    const raw = localStorage.getItem(`${CACHE_KEY}_${userId}`);
-    if (!raw) return null;
-    const cached: CachedHome = JSON.parse(raw);
-    if (Date.now() - cached.timestamp > CACHE_TTL) return null;
-    return cached;
-  } catch {
-    return null;
-  }
-}
-
-function saveCache(userId: string, data: CachedHome) {
-  try {
-    localStorage.setItem(`${CACHE_KEY}_${userId}`, JSON.stringify(data));
-  } catch { /* quota exceeded */ }
+function buildPosterUrl(movie: any): string {
+  if (movie.posterUrl) return movie.posterUrl;
+  if (movie.poster_path) return `${POSTER_BASE}${movie.poster_path}`;
+  const slug = movie.title
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-");
+  if (MOVIE_POSTERS[slug]) return MOVIE_POSTERS[slug];
+  return "/placeholder.svg";
 }
 
 export function usePersonalizedHome() {
@@ -59,23 +37,18 @@ export function usePersonalizedHome() {
   const [isLoading, setIsLoading] = useState(false);
   const [hasPersonalization, setHasPersonalization] = useState(false);
   const inFlightRef = useRef(false);
-  const hasFetchedRef = useRef(false);
+  const lastFetchRef = useRef<number>(0);
 
   const fetchPersonalization = useCallback(async (force = false) => {
-    if (!user || inFlightRef.current) return;
+    if (!user || inFlightRef.current) {
+      if (!user) setHasPersonalization(false);
+      return;
+    }
 
-    const tasteBioHash = hashString(profile?.taste_bio || "");
-
-    // Check localStorage cache first (unless forced)
-    if (!force) {
-      const cached = loadCache(user.id);
-      if (cached && cached.tasteBioHash === tasteBioHash && cached.sections.length > 0) {
-        setPersonalizedSections(cached.sections);
-        setTasteSummary(cached.tasteSummary);
-        setHasPersonalization(true);
-        hasFetchedRef.current = true;
-        return;
-      }
+    // Throttle: don't re-fetch more than once per 5 minutes unless forced
+    const now = Date.now();
+    if (!force && now - lastFetchRef.current < 5 * 60 * 1000 && hasPersonalization) {
+      return;
     }
 
     inFlightRef.current = true;
@@ -97,6 +70,7 @@ export function usePersonalizedHome() {
       if (!resp.ok) throw new Error("Personalization failed");
 
       const data: PersonalizedHome = await resp.json();
+      lastFetchRef.current = Date.now();
 
       if (data.sections && data.sections.length > 0) {
         const sections = data.sections.map((section) => ({
@@ -106,8 +80,8 @@ export function usePersonalizedHome() {
             title: m.title,
             year: m.year,
             rating: m.rating,
-            posterUrl: m.posterUrl || "/placeholder.svg",
-            platforms: m.platforms || [],
+            posterUrl: m.posterUrl || buildPosterUrl(m),
+            platforms: m.platforms || ["netflix"],
             genres: m.genres || [],
             matchPercent: typeof m.matchPercent === "number" ? m.matchPercent : undefined,
             description: m.description,
@@ -117,15 +91,6 @@ export function usePersonalizedHome() {
         setPersonalizedSections(sections);
         setTasteSummary(data.taste_summary);
         setHasPersonalization(true);
-        hasFetchedRef.current = true;
-
-        // Save to localStorage cache
-        saveCache(user.id, {
-          sections,
-          tasteSummary: data.taste_summary,
-          timestamp: Date.now(),
-          tasteBioHash,
-        });
       } else {
         setHasPersonalization(false);
       }
@@ -136,23 +101,21 @@ export function usePersonalizedHome() {
       inFlightRef.current = false;
       setIsLoading(false);
     }
+  }, [user, hasPersonalization]);
+
+  // Initial fetch and fetch when taste_bio changes
+  useEffect(() => {
+    if (user) {
+      fetchPersonalization(!!profile?.taste_bio);
+    }
   }, [user, profile?.taste_bio]);
 
-  // Fetch once on mount or when taste_bio changes significantly
+  // Retry only if no personalization yet (max once per 30s)
   useEffect(() => {
-    if (!user || hasFetchedRef.current) return;
-    fetchPersonalization();
-  }, [user]);
-
-  // Re-fetch when taste_bio changes (force)
-  useEffect(() => {
-    if (!user || !profile?.taste_bio) return;
-    const cached = loadCache(user.id);
-    const currentHash = hashString(profile.taste_bio || "");
-    if (cached && cached.tasteBioHash !== currentHash) {
-      fetchPersonalization(true);
-    }
-  }, [profile?.taste_bio]);
+    if (!user || hasPersonalization) return;
+    const interval = setInterval(() => fetchPersonalization(), 30000);
+    return () => clearInterval(interval);
+  }, [user, hasPersonalization]);
 
   return {
     personalizedSections,

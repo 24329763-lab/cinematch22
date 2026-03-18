@@ -71,6 +71,7 @@ Se não houver sinais claros, retorne {"signals": []}`,
     const text = data.choices?.[0]?.message?.content;
     if (!text) return;
 
+    // Extract JSON from possible markdown code blocks
     let jsonStr = text;
     const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
     if (jsonMatch) jsonStr = jsonMatch[1];
@@ -103,11 +104,9 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
 
   try {
-    const { messages, mode } = await req.json();
+    const { messages } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
-
-    const isOnboarding = mode === "onboarding";
 
     // Try to get user ID for taste extraction
     let userId: string | null = null;
@@ -126,57 +125,31 @@ serve(async (req) => {
 
     // Detect conversation mode
     const lastUserMsg = messages.filter((m: any) => m.role === "user").pop()?.content?.toLowerCase() || "";
-    const isTasteMode = isOnboarding || /\b(meu gosto|gosto em filmes|que tipo de filme|me conhecer|perfil|preferências|o que eu curto|entender meu gosto|conversar sobre|quero conversar)\b/i.test(lastUserMsg);
+    const isTasteMode = /\b(meu gosto|gosto em filmes|que tipo de filme|me conhecer|perfil|preferências|o que eu curto|entender meu gosto|conversar sobre|quero conversar)\b/i.test(lastUserMsg);
 
-    let systemPrompt: string;
+    const systemPrompt = `Você é o CineMatch — conciso, esperto, cinéfilo. Português brasileiro sempre.
 
-    if (isOnboarding) {
-      systemPrompt = `Você é o CineMatch — assistente pessoal de cinema. Português brasileiro sempre.
+Seja direto. Nada de introduções longas ou explicações óbvias. Fale como um amigo que manja de cinema, não como um robô.
 
-Você está no MODO ONBOARDING — seu objetivo é conhecer o gosto do usuário em cinema de forma natural e divertida.
+MODO ATUAL: ${isTasteMode ? "PERFIL DE GOSTO" : "RECOMENDAÇÃO"}
 
-REGRAS DO ONBOARDING:
-- Reaja GENUINAMENTE ao que o usuário diz. Se ele mencionar um filme, comente algo específico sobre esse filme.
-- Se o usuário der uma resposta vaga ou errada, ajude gentilmente. Ex: se confundir nomes de filmes, sugira: "Será que você quis dizer X?"
-- Faça 1-2 perguntas por mensagem, máximo. Não interrogue.
-- Explore: gêneros favoritos, filmes marcantes, o que irrita em filmes, moods preferidos, quando/como assiste
-- Seja curto e direto. Nada de textão.
-- Use emojis com moderação (1-2 por mensagem)
-- Conecte padrões: "Ah, você curte histórias de superação com protagonistas fortes, né?"
-- Depois de 3-4 trocas de mensagem, encerre dizendo algo como: "Já tenho uma boa ideia do seu gosto! Vou preparar recomendações perfeitas pra você 🎬"
-- Quando sentir que já tem info suficiente (3-4 mensagens do usuário), inclua a frase exata "[ONBOARDING_COMPLETE]" no final da sua resposta (isso será detectado pelo app)
-- NÃO recomende filmes no onboarding, foque em conhecer o gosto
-
-IMPORTANTE: Responda de forma NATURAL e PERSONALIZADA. Nunca dê respostas genéricas ou pré-fabricadas.`;
-    } else if (isTasteMode) {
-      systemPrompt = `Você é o CineMatch — conciso, esperto, cinéfilo. Português brasileiro sempre.
-
-MODO PERFIL DE GOSTO:
+${isTasteMode ? `MODO PERFIL DE GOSTO (ativo agora):
 - NÃO recomende filmes. Zero. Nenhum título em negrito.
 - Faça perguntas sobre o que a pessoa sente ao assistir filmes
 - Explore moods, cenários, temas, elementos que ela curte ou não
 - Pergunte "em que momento você assiste?" — chuva, sozinho, casal, noite, etc.
 - Conecte padrões: "parece que você curte histórias de superação, né?"
 - Pergunte sobre coisas que IRRITAM em filmes (clichês, finais, ritmo)
+- Explore fora do cinema: animais, viagens, hobbies — tudo ajuda a entender
 - Seja curioso e natural, não interrogador
-- Máximo 2 perguntas por mensagem
-
-REGRAS GERAIS: Sem notas de IMDb/RT. Sem inventar filmes. Sem textão. Seja direto.`;
-    } else {
-      systemPrompt = `Você é o CineMatch — conciso, esperto, cinéfilo. Português brasileiro sempre.
-
-Seja direto. Nada de introduções longas ou explicações óbvias. Fale como um amigo que manja de cinema, não como um robô.
-
-MODO RECOMENDAÇÃO:
-- OBRIGATÓRIO: Recomende entre **6 e 10 filmes** por resposta
-- Formato: **Título (Ano)** — sempre com ano entre parênteses
+- Máximo 2 perguntas por mensagem` : `MODO RECOMENDAÇÃO (ativo agora):
+- OBRIGATÓRIO: **Título (Ano)** — sempre com ano entre parênteses
 - 1 frase curta dizendo POR QUE a pessoa vai curtir
 - Plataforma se souber (Netflix, Prime, Disney+)
-- Varie os gêneros e estilos dentro das recomendações
-- 1 pergunta curta no final pra refinar as próximas sugestões
+- 3-5 filmes, sem enrolação
+- 1 pergunta curta no final pra refinar`}
 
 REGRAS GERAIS: Sem notas de IMDb/RT. Sem inventar filmes. Sem textão.`;
-    }
 
     const response = await fetch(GATEWAY_URL, {
       method: "POST",
@@ -215,8 +188,11 @@ REGRAS GERAIS: Sem notas de IMDb/RT. Sem inventar filmes. Sem textão.`;
       );
     }
 
+    // Taste extraction runs after stream completes
     const shouldExtract = !!userId && messages.length >= 1;
 
+    // Gateway already returns OpenAI-compatible SSE, pass through directly
+    // but we need to tap into the stream for taste extraction
     const { readable, writable } = new TransformStream();
     const writer = writable.getWriter();
     const encoder = new TextEncoder();
@@ -225,15 +201,23 @@ REGRAS GERAIS: Sem notas de IMDb/RT. Sem inventar filmes. Sem textão.`;
       try {
         const reader = response.body!.getReader();
         const decoder = new TextDecoder();
+        let buffer = "";
         let fullResponse = "";
 
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
           const chunk = decoder.decode(value, { stream: true });
+          buffer += chunk;
+
+          // Pass through to client
           await writer.write(encoder.encode(chunk));
 
-          for (const line of chunk.split("\n")) {
+          // Collect full response for taste extraction
+          let newlineIdx: number;
+          const tempBuf = buffer;
+          buffer = "";
+          for (const line of tempBuf.split("\n")) {
             if (!line.startsWith("data: ")) continue;
             const jsonStr = line.slice(6).trim();
             if (!jsonStr || jsonStr === "[DONE]") continue;
@@ -245,6 +229,7 @@ REGRAS GERAIS: Sem notas de IMDb/RT. Sem inventar filmes. Sem textão.`;
           }
         }
 
+        // Extract taste signals after streaming completes
         if (shouldExtract && fullResponse) {
           const allMsgs = [...messages, { role: "assistant", content: fullResponse }];
           await extractTasteSignals(allMsgs, userId!);
