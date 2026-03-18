@@ -16,10 +16,8 @@ const queryClient = new QueryClient();
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
-
   if (loading) return null;
   if (!user) return <Navigate to="/auth" />;
-
   return <>{children}</>;
 };
 
@@ -29,14 +27,16 @@ const OnboardingCheck = ({ children }: { children: React.ReactNode }) => {
 
   if (loading) return null;
 
-  // If user is logged in but hasn't done onboarding, show it
-  if (user && profile && !profile.taste_bio && !skipped) {
-    return <Navigate to="/onboarding" />;
-  }
-
-  // If guest hasn't done onboarding and hasn't skipped, show it
-  if (!user && !skipped) {
-    return <Navigate to="/onboarding" />;
+  // Only redirect to onboarding if the user hasn't skipped it yet
+  if (!skipped) {
+    // If logged in but no taste profile
+    if (user && profile && !profile.taste_bio) {
+      return <Navigate to="/onboarding" />;
+    }
+    // If not logged in at all
+    if (!user) {
+      return <Navigate to="/onboarding" />;
+    }
   }
 
   return <>{children}</>;
@@ -49,9 +49,12 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
+          {/* Public Routes */}
           <Route path="/auth" element={<AuthPage />} />
           <Route path="/onboarding" element={<OnboardingPage />} />
+          <Route path="/movie/:slug" element={<MoviePage />} />
 
+          {/* Main Home Route with Onboarding Check */}
           <Route
             path="/"
             element={
@@ -61,6 +64,7 @@ const App = () => (
             }
           />
 
+          {/* Protected Routes */}
           <Route
             path="/chat"
             element={
@@ -88,8 +92,7 @@ const App = () => (
             }
           />
 
-          <Route path="/movie/:slug" element={<MoviePage />} />
-
+          {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
