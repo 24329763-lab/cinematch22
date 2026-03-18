@@ -26,7 +26,8 @@ const DEFAULT_HEROES: HeroMovie[] = [
     year: 2019,
     rating: 8.5,
     genres: ["Suspense", "Drama"],
-    description: "Uma família pobre se infiltra na vida de uma família rica. Vencedor do Oscar de Melhor Filme — Bong Joon-ho no seu melhor.",
+    description:
+      "Uma família pobre se infiltra na vida de uma família rica. Vencedor do Oscar de Melhor Filme — Bong Joon-ho no seu melhor.",
     backdropUrl: "/posters/parasita.jpg",
     posterUrl: "/posters/parasita.jpg",
   },
@@ -36,7 +37,8 @@ const DEFAULT_HEROES: HeroMovie[] = [
     year: 2024,
     rating: 8.1,
     genres: ["Ficção Científica", "Épico"],
-    description: "Paul Atreides se une aos Fremen numa jornada épica. Denis Villeneuve entrega uma das maiores experiências visuais do cinema.",
+    description:
+      "Paul Atreides se une aos Fremen numa jornada épica. Denis Villeneuve entrega uma das maiores experiências visuais do cinema.",
     backdropUrl: "/posters/duna-2.jpg",
     posterUrl: "/posters/duna-2.jpg",
   },
@@ -46,7 +48,8 @@ const DEFAULT_HEROES: HeroMovie[] = [
     year: 2023,
     rating: 8.3,
     genres: ["Drama", "Biografia"],
-    description: "A história do homem que criou a bomba atômica e enfrentou as consequências morais de sua invenção. Christopher Nolan no auge.",
+    description:
+      "A história do homem que criou a bomba atômica e enfrentou as consequências morais de sua invenção. Christopher Nolan no auge.",
     backdropUrl: "/posters/oppenheimer.jpg",
     posterUrl: "/posters/oppenheimer.jpg",
   },
@@ -56,14 +59,15 @@ const DEFAULT_HEROES: HeroMovie[] = [
     year: 2014,
     rating: 8.5,
     genres: ["Drama", "Música"],
-    description: "Um jovem baterista de jazz é pressionado além dos limites por um instrutor abusivo em busca da perfeição.",
+    description:
+      "Um jovem baterista de jazz é pressionado além dos limites por um instrutor abusivo em busca da perfeição.",
     backdropUrl: "/posters/whiplash.jpg",
     posterUrl: "/posters/whiplash.jpg",
   },
 ];
 
 const POSTER_BASE = "https://image.tmdb.org/t/p/w780";
-const HERO_SET_SIZE = 4;
+const HERO_SET_SIZE = 8;
 const HERO_ROTATE_MS = 12_000;
 const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
 
@@ -98,7 +102,8 @@ function getSixHourBucket(): number {
 }
 
 function movieToHero(movie: any): HeroMovie {
-  const posterUrl = movie.posterUrl || (movie.poster_path ? `${POSTER_BASE}${movie.poster_path}` : "/posters/ainda-estou-aqui.jpg");
+  const posterUrl =
+    movie.posterUrl || (movie.poster_path ? `${POSTER_BASE}${movie.poster_path}` : "/posters/ainda-estou-aqui.jpg");
   return {
     id: String(movie.id || movie.title),
     title: movie.title,
@@ -135,12 +140,15 @@ export default function HeroCarousel({ personalizedSections, hasPersonalization 
   const imgX = useSpring(useTransform(mouseX, [0, 1], [8, -8]), springConfig);
   const imgY = useSpring(useTransform(mouseY, [0, 1], [8, -8]), springConfig);
 
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    const rect = containerRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    mouseX.set((e.clientX - rect.left) / rect.width);
-    mouseY.set((e.clientY - rect.top) / rect.height);
-  }, [mouseX, mouseY]);
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent) => {
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      mouseX.set((e.clientX - rect.left) / rect.width);
+      mouseY.set((e.clientY - rect.top) / rect.height);
+    },
+    [mouseX, mouseY],
+  );
 
   const handleMouseLeave = useCallback(() => {
     mouseX.set(0.5);
@@ -202,16 +210,19 @@ export default function HeroCarousel({ personalizedSections, hasPersonalization 
       return;
     }
     const slug = hero.id || hero.title.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-    const { error } = await supabase.from("watchlist").upsert({
-      user_id: user.id,
-      movie_id: slug,
-      title: hero.title,
-      poster_url: hero.posterUrl,
-      year: hero.year,
-      rating: hero.rating,
-      platforms: hero.platforms || ["netflix"],
-      genres: hero.genres,
-    }, { onConflict: "user_id,movie_id" });
+    const { error } = await supabase.from("watchlist").upsert(
+      {
+        user_id: user.id,
+        movie_id: slug,
+        title: hero.title,
+        poster_url: hero.posterUrl,
+        year: hero.year,
+        rating: hero.rating,
+        platforms: hero.platforms || ["netflix"],
+        genres: hero.genres,
+      },
+      { onConflict: "user_id,movie_id" },
+    );
     if (!error) {
       setAddedIds((prev) => new Set(prev).add(hero.id));
       toast({ title: "Adicionado à sua lista!" });
@@ -282,7 +293,9 @@ export default function HeroCarousel({ personalizedSections, hasPersonalization 
                   </span>
                   <span className="text-sm text-muted-foreground tabular-nums">{hero.year}</span>
                   {hero.genres.map((g) => (
-                    <span key={g} className="text-xs px-2 py-0.5 rounded-full glass text-foreground/80">{g}</span>
+                    <span key={g} className="text-xs px-2 py-0.5 rounded-full glass text-foreground/80">
+                      {g}
+                    </span>
                   ))}
                 </div>
 
@@ -294,7 +307,10 @@ export default function HeroCarousel({ personalizedSections, hasPersonalization 
               <button className="flex items-center gap-2 gradient-primary text-primary-foreground px-6 py-3 rounded-full text-sm font-bold hover:opacity-90 transition-opacity cinema-glow">
                 <Play size={16} fill="currentColor" /> Assistir Agora
               </button>
-              <button onClick={addToWatchlist} className="flex items-center gap-2 glass text-foreground px-6 py-3 rounded-full text-sm font-semibold hover:bg-white/10 transition-colors">
+              <button
+                onClick={addToWatchlist}
+                className="flex items-center gap-2 glass text-foreground px-6 py-3 rounded-full text-sm font-semibold hover:bg-white/10 transition-colors"
+              >
                 {isAdded ? <Check size={16} /> : <Plus size={16} />}
                 {isAdded ? "Na Lista" : "Minha Lista"}
               </button>
