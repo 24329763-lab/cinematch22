@@ -47,12 +47,11 @@ const OnboardingPage = () => {
     try {
       let fullResponse = "";
 
-      // We call streamChat with the messages and callbacks
-      // Based on your project's chat-stream.ts, it likely takes 3 arguments
-      await streamChat(
-        newMessages,
-        (chunk: string) => {
-          fullResponse += chunk;
+      // Corrected streamChat call to use the object format your function expects
+      await streamChat({
+        messages: newMessages,
+        onDelta: (deltaText: string) => {
+          fullResponse += deltaText;
           setMessages((prev) => {
             const updated = [...prev];
             const lastMsg = updated[updated.length - 1];
@@ -63,7 +62,7 @@ const OnboardingPage = () => {
             }
           });
         },
-        () => {
+        onDone: () => {
           setMessages((prev) => {
             const updated = [...prev];
             const lastMsg = updated[updated.length - 1];
@@ -75,7 +74,11 @@ const OnboardingPage = () => {
           });
           setLoading(false);
         },
-      );
+        onError: (error: string) => {
+          toast({ variant: "destructive", title: error });
+          setLoading(false);
+        },
+      });
     } catch (err) {
       console.error("Streaming error:", err);
       toast({ variant: "destructive", title: "Erro ao processar resposta" });
