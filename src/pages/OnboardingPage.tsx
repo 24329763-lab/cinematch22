@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Sparkles, Film, Heart, Compass, Star, LogOut } from "lucide-react";
+import { Send, Sparkles, LogOut } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -16,18 +16,13 @@ const OnboardingPage = () => {
   const [loading, setLoading] = useState(false);
   const [onboardingComplete, setOnboardingComplete] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const { user, profile, signOut, refreshProfile } = useAuth();
+  const { user, signOut, refreshProfile } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
 
   useEffect(() => {
     if (messages.length === 0) {
-      setMessages([
-        {
-          role: "assistant",
-          content: INITIAL_MESSAGE,
-        },
-      ]);
+      setMessages([{ role: "assistant", content: INITIAL_MESSAGE }]);
     }
   }, []);
 
@@ -35,8 +30,28 @@ const OnboardingPage = () => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages]);
 
+  const finishOnboarding = async (chatHistory: string) => {
+    try {
+      if (user) {
+        const { error } = await supabase
+          .from("profiles")
+          .update({ taste_bio: chatHistory, onboarding_complete: true } as any)
+          .eq("user_id", user.id);
+        if (error) throw error;
+        if (refreshProfile) await refreshProfile();
+      } else {
+        sessionStorage.setItem("guest_taste_bio", chatHistory);
+      }
+      setOnboardingComplete(true);
+      setTimeout(() => navigate("/"), 1500);
+    } catch (err) {
+      console.error(err);
+      toast({ variant: "destructive", title: "Erro ao salvar perfil" });
+    }
+  };
+
   const handleSend = async () => {
-    if (!input.trim() || loading) return;
+    if (!input.trim() || loading || onboardingComplete) return;
 
     const userMsg = { role: "user", content: input };
     const newMessages = [...messages, userMsg];
@@ -47,9 +62,9 @@ const OnboardingPage = () => {
     try {
       let fullResponse = "";
 
-      // Corrected streamChat call to use the object format your function expects
       await streamChat({
-        messages: newMessages,
+        messages: newMessages.filter((m) => !m.isStreaming),
+        mode: "onboarding",
         onDelta: (deltaText: string) => {
           fullResponse += deltaText;
           setMessages((prev) => {
@@ -73,6 +88,15 @@ const OnboardingPage = () => {
             return updated;
           });
           setLoading(false);
+
+          // Check if AI signaled onboarding completion
+          if (fullResponse.includes("[ONBOARDING_COMPLETE]")) {
+            const chatHistory = [...newMessages, { role: "assistant", content: fullResponse }]
+              .filter((m) => m.role === "user")
+              .map((m) => m.content)
+              .join("\n");
+            finishOnboarding(chatHistory);
+          }
         },
         onError: (error: string) => {
           toast({ variant: "destructive", title: error });
@@ -92,39 +116,18 @@ const OnboardingPage = () => {
   };
 
   const handleFinishOnboarding = async () => {
-    try {
-      const chatHistory = messages
-        .filter((m) => m.role === "user")
-        .map((m) => m.content)
-        .join("\n");
-
-      if (user) {
-        const { error } = await supabase
-          .from("profiles")
-          .update({ taste_bio: chatHistory } as any)
-          .eq("user_id", user.id);
-
-        if (error) throw error;
-        if (refreshProfile) await refreshProfile();
-      } else {
-        sessionStorage.setItem("guest_taste_bio", chatHistory);
-      }
-
-      setOnboardingComplete(true);
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: "Perfeito! Já entendi tudo. Estou preparando sua home personalizada agora mesmo... 🎬✨",
-        },
-      ]);
-
-      setTimeout(() => navigate("/"), 2000);
-    } catch (err) {
-      console.error(err);
-      toast({ variant: "destructive", title: "Erro ao salvar perfil" });
-    }
+    const chatHistory = messages
+      .filter((m) => m.role === "user")
+      .map((m) => m.content)
+      .join("\n");
+    await finishOnboarding(chatHistory);
   };
+
+  // Clean [ONBOARDING_COMPLETE] from displayed messages
+  const displayMessages = messages.map((m) => ({
+    ...m,
+    content: m.content.replace(/\[ONBOARDING_COMPLETE\]/g, "").trim(),
+  }));
 
   return (
     <div className="min-h-dvh flex flex-col pt-8 pb-4 px-4 relative overflow-hidden bg-background">
@@ -141,10 +144,7 @@ const OnboardingPage = () => {
           <h1 className="text-xl font-black tracking-display">CineMatch</h1>
         </div>
         <div className="flex items-center gap-4">
-          <button
-            onClick={handleSkip}
-            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-          >
+          <button onClick={handleSkip} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
             Pular
           </button>
           {user && (
@@ -161,7 +161,7 @@ const OnboardingPage = () => {
       <div className="flex-1 max-w-lg mx-auto w-full flex flex-col min-h-0 bg-transparent">
         <div ref={scrollRef} className="flex-1 overflow-y-auto space-y-4 pb-4 pr-1 scrollbar-hide">
           <AnimatePresence initial={false}>
-            {messages.map((msg, i) => (
+            {displayMessages.map((msg, i) => (
               <motion.div
                 key={i}
                 initial={{ opacity: 0, y: 10, scale: 0.95 }}
@@ -180,7 +180,7 @@ const OnboardingPage = () => {
               </motion.div>
             ))}
           </AnimatePresence>
-          {loading && (
+          {loading && !messages.some((m) => m.isStreaming) && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -191,39 +191,47 @@ const OnboardingPage = () => {
               <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse [animation-delay:0.4s]" />
             </motion.div>
           )}
-        </div>
 
-        <div className="mt-4 pt-4 border-t border-border/10">
-          <div className="flex gap-2">
-            <input
-              autoFocus
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSend()}
-              placeholder="Digite sua resposta..."
-              className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all"
-            />
-            <button
-              onClick={handleSend}
-              disabled={!input.trim() || loading}
-              className="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center text-primary-foreground disabled:opacity-30 transition-all shadow-lg"
-            >
-              <Send size={18} />
-            </button>
-          </div>
-
-          {messages.length > 2 && !onboardingComplete && (
-            <div className="mt-4 flex gap-2 justify-center">
-              <button
-                onClick={handleFinishOnboarding}
-                disabled={loading}
-                className="text-xs px-4 py-2 rounded-full gradient-primary text-primary-foreground font-semibold hover:opacity-90 transition-opacity disabled:opacity-50"
-              >
-                Finalizar Onboarding
-              </button>
-            </div>
+          {onboardingComplete && (
+            <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="text-center py-4">
+              <p className="text-sm text-muted-foreground">Redirecionando para sua home personalizada...</p>
+            </motion.div>
           )}
         </div>
+
+        {!onboardingComplete && (
+          <div className="mt-4 pt-4 border-t border-border/10">
+            <div className="flex gap-2">
+              <input
+                autoFocus
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSend()}
+                placeholder="Digite sua resposta..."
+                className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all"
+              />
+              <button
+                onClick={handleSend}
+                disabled={!input.trim() || loading}
+                className="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center text-primary-foreground disabled:opacity-30 transition-all shadow-lg"
+              >
+                <Send size={18} />
+              </button>
+            </div>
+
+            {messages.filter((m) => m.role === "user").length >= 2 && (
+              <div className="mt-4 flex gap-2 justify-center">
+                <button
+                  onClick={handleFinishOnboarding}
+                  disabled={loading}
+                  className="text-xs px-4 py-2 rounded-full gradient-primary text-primary-foreground font-semibold hover:opacity-90 transition-opacity disabled:opacity-50"
+                >
+                  Finalizar e ver recomendações
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
