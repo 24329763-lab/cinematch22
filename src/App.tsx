@@ -29,11 +29,11 @@ const AppContent = () => {
 
     const isAuthPage = pathname === "/auth";
     const isOnboardingPage = pathname === "/onboarding";
-    const skipped = sessionStorage.getItem("onboarding_skipped") === "true";
 
-    // If logged in but no onboarding done, send to onboarding (unless skipped)
-    if (user && !isAuthPage && !isOnboardingPage && !skipped) {
-      if (!profile?.taste_bio && !profile?.onboarding_complete) {
+    // If logged in but no onboarding done, send to onboarding
+    // We check taste_bio as an indicator if the process was done
+    if (user && !isAuthPage && !isOnboardingPage) {
+      if (!profile?.taste_bio) {
         navigate("/onboarding");
       }
     }
