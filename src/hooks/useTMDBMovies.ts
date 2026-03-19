@@ -35,7 +35,7 @@ export function useTMDBMovies() {
     const cached = loadTMDBCache();
     if (cached && cached.length > 0) {
       setSections(cached);
-      fetchedRef.current = true;
+      // Don't set fetchedRef so it can refresh if personalization loads later
       return;
     }
 
