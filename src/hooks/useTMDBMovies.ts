@@ -35,7 +35,7 @@ export function useTMDBMovies() {
     const cached = loadTMDBCache();
     if (cached && cached.length > 0) {
       setSections(cached);
-      fetchedRef.current = true;
+      // Don't set fetchedRef so it can refresh if personalization loads later
       return;
     }
 
@@ -69,9 +69,12 @@ export function useTMDBMovies() {
           }));
           setSections(mapped);
           fetchedRef.current = true;
-          try {
-            localStorage.setItem(TMDB_CACHE_KEY, JSON.stringify({ sections: mapped, timestamp: Date.now() }));
-          } catch {}
+          // Only cache if we got actual results
+          if (mapped.length > 0) {
+            try {
+              localStorage.setItem(TMDB_CACHE_KEY, JSON.stringify({ sections: mapped, timestamp: Date.now() }));
+            } catch {}
+          }
         }
       } catch (e) {
         console.error("TMDB fallback fetch error:", e);
