@@ -69,9 +69,12 @@ export function useTMDBMovies() {
           }));
           setSections(mapped);
           fetchedRef.current = true;
-          try {
-            localStorage.setItem(TMDB_CACHE_KEY, JSON.stringify({ sections: mapped, timestamp: Date.now() }));
-          } catch {}
+          // Only cache if we got actual results
+          if (mapped.length > 0) {
+            try {
+              localStorage.setItem(TMDB_CACHE_KEY, JSON.stringify({ sections: mapped, timestamp: Date.now() }));
+            } catch {}
+          }
         }
       } catch (e) {
         console.error("TMDB fallback fetch error:", e);
