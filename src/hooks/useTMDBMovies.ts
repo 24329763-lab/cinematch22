@@ -43,9 +43,18 @@ export function useTMDBMovies() {
       setIsLoading(true);
       try {
         const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/personalize`;
+        // Try to get auth token for personalized results
+        let authHeaders: Record<string, string> = {};
+        try {
+          const { supabase } = await import("@/integrations/supabase/client");
+          const { data } = await supabase.auth.getSession();
+          if (data?.session?.access_token) {
+            authHeaders = { Authorization: `Bearer ${data.session.access_token}` };
+          }
+        } catch {}
         const resp = await fetch(url, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", ...authHeaders },
           body: JSON.stringify({}),
         });
         if (!resp.ok) throw new Error("Failed");
