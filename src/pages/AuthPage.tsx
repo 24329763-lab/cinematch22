@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Mail, Sparkles, Eye, EyeOff } from "lucide-react";
-// We DO NOT import lovable auth anymore. We use Supabase directly.
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -15,7 +14,6 @@ const AuthPage = () => {
 
   const handleGoogle = async () => {
     setLoading(true);
-    // Bypass Lovable entirely and go straight to the new Supabase project
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
@@ -34,13 +32,19 @@ const AuthPage = () => {
     setLoading(true);
     try {
       if (mode === "signup") {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: { emailRedirectTo: window.location.origin },
         });
         if (error) throw error;
-        toast({ title: "Verifique seu email", description: "Enviamos um link de confirmação." });
+
+        // If email confirmation is off, data.session will exist representing immediate login
+        if (data.session) {
+          toast({ title: "Bem-vindo!", description: "Conta criada com sucesso." });
+        } else {
+          toast({ title: "Verifique seu email", description: "Enviamos um link de confirmação." });
+        }
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
@@ -51,7 +55,6 @@ const AuthPage = () => {
     setLoading(false);
   };
 
-  // ... (The rest of the visual code remains identical)
   return (
     <div className="min-h-dvh flex items-center justify-center px-4 relative">
       <div className="fixed inset-0 pointer-events-none overflow-hidden -z-10">
@@ -103,7 +106,6 @@ const AuthPage = () => {
           <div className="flex-1 h-px bg-border" />
         </div>
 
-        {/* Email form */}
         <form onSubmit={handleEmail} className="space-y-3">
           <div className="glass-surface rounded-2xl px-4 py-2.5 focus-within:ring-1 focus-within:ring-primary/50 transition-all">
             <input
