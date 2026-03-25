@@ -7,8 +7,13 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_b_pwD_Bp62NwtcWOfSKG8A_tPk6vtBu
 
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
-    persistSession: true,
+    persistSession: false, // Forces a fresh start on every browser
     autoRefreshToken: true,
-    detectSessionInUrl: true,
+  },
+  global: {
+    headers: {
+      // This wipes out the "Lovable Identity" that is causing the 403 error
+      Authorization: `Bearer sb_publishable_b_pwD_Bp62NwtcWOfSKG8A_tPk6vtBu`,
+    },
   },
 });
