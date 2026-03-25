@@ -55,10 +55,13 @@ Responda APENAS em JSON válido:
 {
   "signals": [
     {"signal_type": "like", "category": "genre", "value": "terror psicológico", "confidence": 0.9}
-  ]
+  ],
+  "blocked_elements": ["violência com animais", "aranhas"]
 }
 
-Se não houver sinais claros, retorne {"signals": []}`,
+O campo "blocked_elements" deve conter APENAS coisas que o usuário disse EXPLICITAMENTE que NÃO QUER ver ou não suporta. Exemplos: "não aguento filme com aranha", "odeio violência gratuita", "não quero ver nada com palhaço".
+Se não houver bloqueios explícitos, retorne "blocked_elements": []
+Se não houver sinais claros, retorne {"signals": [], "blocked_elements": []}`,
           },
         ],
         temperature: 0.3,
@@ -75,24 +78,46 @@ Se não houver sinais claros, retorne {"signals": []}`,
     const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
     if (jsonMatch) jsonStr = jsonMatch[1];
 
-    const { signals } = JSON.parse(jsonStr.trim());
-    if (!signals || signals.length === 0) return;
+    const parsed = JSON.parse(jsonStr.trim());
+    const { signals, blocked_elements } = parsed;
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const serviceClient = createClient(supabaseUrl, serviceKey);
 
-    const rows = signals.map((s: any) => ({
-      user_id: userId,
-      signal_type: s.signal_type,
-      category: s.category,
-      value: s.value,
-      confidence: s.confidence || 0.7,
-      source: "chat",
-    }));
+    // Save taste signals
+    if (signals && signals.length > 0) {
+      const rows = signals.map((s: any) => ({
+        user_id: userId,
+        signal_type: s.signal_type,
+        category: s.category,
+        value: s.value,
+        confidence: s.confidence || 0.7,
+        source: "chat",
+      }));
+      await serviceClient.from("taste_signals").insert(rows);
+      console.log(`Extracted ${rows.length} taste signals for user ${userId}`);
+    }
 
-    await serviceClient.from("taste_signals").insert(rows);
-    console.log(`Extracted ${rows.length} taste signals for user ${userId}`);
+    // Save blocked elements to profile
+    if (blocked_elements && blocked_elements.length > 0) {
+      const { data: profile } = await serviceClient
+        .from("profiles")
+        .select("blocked_elements")
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      const existing: string[] = profile?.blocked_elements || [];
+      const newBlocked = blocked_elements.filter((b: string) => !existing.includes(b.toLowerCase()));
+      if (newBlocked.length > 0) {
+        const merged = [...existing, ...newBlocked.map((b: string) => b.toLowerCase())];
+        await serviceClient
+          .from("profiles")
+          .update({ blocked_elements: merged })
+          .eq("user_id", userId);
+        console.log(`Added ${newBlocked.length} blocked elements for user ${userId}: ${newBlocked.join(", ")}`);
+      }
+    }
   } catch (e) {
     console.error("Taste extraction error (non-blocking):", e);
   }
