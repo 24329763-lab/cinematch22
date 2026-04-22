@@ -29,11 +29,13 @@ const AppContent = () => {
 
     const isAuthPage = pathname === "/auth";
     const isOnboardingPage = pathname === "/onboarding";
-    const skipped = sessionStorage.getItem("onboarding_skipped") === "true";
 
-    // If logged in but no onboarding done, send to onboarding (unless skipped)
-    if (user && !isAuthPage && !isOnboardingPage && !skipped) {
-      if (!profile?.taste_bio && !profile?.onboarding_complete) {
+    // Always force onboarding when logged in and not yet personalized.
+    // Skip flag is per-session only and only suppresses the redirect for this tab.
+    if (user && !isAuthPage && !isOnboardingPage) {
+      const isPersonalized = !!profile?.taste_bio || !!profile?.onboarding_complete;
+      const skipped = sessionStorage.getItem("onboarding_skipped") === "true";
+      if (!isPersonalized && !skipped) {
         navigate("/onboarding");
       }
     }

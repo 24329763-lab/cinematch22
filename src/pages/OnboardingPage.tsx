@@ -143,9 +143,12 @@ const OnboardingPage = () => {
           </div>
           <h1 className="text-xl font-black tracking-display">CineMatch</h1>
         </div>
-        <div className="flex items-center gap-4">
-          <button onClick={handleSkip} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
-            Pular
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleSkip}
+            className="text-xs px-3 py-1.5 rounded-full border border-border/30 bg-white/5 hover:bg-white/10 text-foreground/80 hover:text-foreground transition-colors"
+          >
+            Pular onboarding
           </button>
           {user && (
             <button
