@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { streamChat } from "@/lib/chat-stream";
 
 const INITIAL_MESSAGE =
-  "Seja bem-vindo ao CineMatch! ✨\n\nSou seu assistente pessoal de cinema. Pra eu te recomendar os filmes perfeitos, preciso conhecer um pouco do seu gosto.\n\nMe conta: quais são seus 3 filmes favoritos da vida?";
+  "Seja bem-vindo ao CineMatch! ✨\n\nSou seu assistente pessoal de cinema e séries. Pra eu te recomendar os títulos perfeitos, preciso conhecer um pouco do seu gosto.\n\nMe conta: quais são seus 3 filmes ou séries favoritos da vida?";
 
 const OnboardingPage = () => {
   const [messages, setMessages] = useState<any[]>([]);
