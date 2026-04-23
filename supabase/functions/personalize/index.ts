@@ -242,12 +242,12 @@ Responda APENAS JSON:
       }
     });
 
-    const trendingPromise = fetchTMDBPool("/trending/movie/week", {}, 2)
+    const trendingMoviePromise = fetchTMDBPool("/trending/movie/week", {}, 2)
       .then((pool) => {
         const movies = filterBlocked(dedupeById(pool).map(mapTMDBMovie), blockedElements);
         return {
           key: "trending",
-          title: "Em Alta Agora",
+          title: "Filmes em Alta",
           subtitle: "Tendências da semana",
           icon: "flame",
           movies: movies.slice(0, 12),
@@ -255,13 +255,28 @@ Responda APENAS JSON:
       })
       .catch(() => null);
 
-    const [sectionResults, trendingSection] = await Promise.all([
+    const trendingTvPromise = fetchTMDBPool("/trending/tv/week", {}, 2)
+      .then((pool) => {
+        const movies = filterBlocked(dedupeById(pool).map(mapTMDBMovie), blockedElements);
+        return {
+          key: "trending_tv",
+          title: "Séries em Alta",
+          subtitle: "As séries do momento",
+          icon: "trending",
+          movies: movies.slice(0, 12),
+        };
+      })
+      .catch(() => null);
+
+    const [sectionResults, trendingMovieSection, trendingTvSection] = await Promise.all([
       Promise.all(tmdbPromises),
-      trendingPromise,
+      trendingMoviePromise,
+      trendingTvPromise,
     ]);
 
     const finalSections: any[] = [];
-    if (trendingSection && trendingSection.movies.length > 0) finalSections.push(trendingSection);
+    if (trendingMovieSection && trendingMovieSection.movies.length > 0) finalSections.push(trendingMovieSection);
+    if (trendingTvSection && trendingTvSection.movies.length > 0) finalSections.push(trendingTvSection);
     for (const s of sectionResults) {
       if (s.movies && s.movies.length > 0) {
         finalSections.push({ key: s.title.toLowerCase().replace(/\s+/g, "-"), ...s });
