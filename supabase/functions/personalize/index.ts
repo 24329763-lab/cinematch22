@@ -106,17 +106,19 @@ serve(async (req) => {
       userId = user?.id || null;
     }
 
-    // Anonymous → return rich TMDB fallback (3 pages each = lots of variety)
+    // Anonymous → return rich TMDB fallback (movies + TV)
     if (!userId) {
-      const [trending, popular, topRated] = await Promise.all([
+      const [trendingMv, popularMv, trendingTv, popularTv] = await Promise.all([
         fetchTMDBPool("/trending/movie/week", {}, 2),
         fetchTMDBPool("/movie/popular", {}, 2),
-        fetchTMDBPool("/movie/top_rated", {}, 2),
+        fetchTMDBPool("/trending/tv/week", {}, 2),
+        fetchTMDBPool("/tv/popular", {}, 2),
       ]);
       const sections = [
-        { key: "trending", title: "Em Alta Esta Semana", subtitle: "O que todo mundo está assistindo", icon: "flame", movies: dedupeById(trending).slice(0, 12).map(mapTMDBMovie) },
-        { key: "popular", title: "Populares", subtitle: "Os mais assistidos", icon: "star", movies: dedupeById(popular).slice(0, 12).map(mapTMDBMovie) },
-        { key: "top_rated", title: "Mais Bem Avaliados", subtitle: "Clássicos e favoritos", icon: "heart", movies: dedupeById(topRated).slice(0, 12).map(mapTMDBMovie) },
+        { key: "trending", title: "Em Alta Esta Semana", subtitle: "Filmes que todo mundo está vendo", icon: "flame", movies: dedupeById(trendingMv).slice(0, 12).map(mapTMDBMovie) },
+        { key: "trending_tv", title: "Séries em Alta", subtitle: "As séries do momento", icon: "trending", movies: dedupeById(trendingTv).slice(0, 12).map(mapTMDBMovie) },
+        { key: "popular", title: "Filmes Populares", subtitle: "Os mais assistidos", icon: "star", movies: dedupeById(popularMv).slice(0, 12).map(mapTMDBMovie) },
+        { key: "popular_tv", title: "Séries Populares", subtitle: "Maratonas que valem a pena", icon: "heart", movies: dedupeById(popularTv).slice(0, 12).map(mapTMDBMovie) },
       ];
       return new Response(JSON.stringify({ sections, taste_summary: null }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
