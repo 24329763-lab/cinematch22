@@ -7,62 +7,55 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// Direct Google Gemini API (no Lovable AI gateway)
-const GEMINI_MODEL_STREAM = "gemini-2.5-flash";
-const GEMINI_MODEL_LIGHT = "gemini-2.5-flash-lite";
-const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
+// Lovable AI Gateway (uses LOVABLE_API_KEY auto-provisioned in Cloud)
+const LOVABLE_AI_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
+const LOVABLE_MODEL_MAIN = "google/gemini-2.5-flash";
+const LOVABLE_MODEL_LIGHT = "google/gemini-2.5-flash-lite";
 
-function buildGeminiContents(messages: { role: string; content: string }[], systemPrompt: string) {
-  // Gemini uses "user" / "model" roles. System goes via systemInstruction.
-  return {
-    systemInstruction: { role: "system", parts: [{ text: systemPrompt }] },
-    contents: messages.map((m) => ({
-      role: m.role === "assistant" ? "model" : "user",
-      parts: [{ text: m.content }],
-    })),
-  };
-}
-
-async function generateGeminiResponse(
+async function callLovableAI(
   messages: { role: string; content: string }[],
   systemPrompt: string,
   apiKey: string,
+  model = LOVABLE_MODEL_MAIN,
 ) {
-  const { systemInstruction, contents } = buildGeminiContents(messages, systemPrompt);
-  const url = `${GEMINI_BASE}/${GEMINI_MODEL_STREAM}:generateContent?key=${apiKey}`;
-  const response = await fetch(url, {
+  const response = await fetch(LOVABLE_AI_URL, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
     body: JSON.stringify({
-      systemInstruction,
-      contents,
-      generationConfig: { temperature: 0.8, maxOutputTokens: 1500 },
+      model,
+      messages: [
+        { role: "system", content: systemPrompt },
+        ...messages,
+      ],
     }),
   });
 
   if (!response.ok) {
     const t = await response.text();
-    console.error("Gemini error:", response.status, t);
-    const status = response.status === 429 ? 429 : response.status === 403 ? 402 : 500;
+    console.error("Lovable AI error:", response.status, t);
+    const status = response.status === 429 ? 429 : response.status === 402 ? 402 : 500;
     const message =
       status === 429
-        ? "Limite da API do Google atingido. Tente em alguns segundos."
+        ? "Muitas requisições. Aguarde alguns segundos."
         : status === 402
-          ? "Chave da API do Gemini sem quota ou inválida."
-          : "Erro no serviço de IA do Google.";
+          ? "Créditos insuficientes. Adicione créditos ao workspace."
+          : "Erro no serviço de IA.";
     return { error: message, status, text: null as string | null };
   }
 
   const data = await response.json();
-  const text = data.candidates?.[0]?.content?.parts?.map((part: any) => part?.text || "").join("")?.trim() || "";
+  const text: string = data?.choices?.[0]?.message?.content?.trim?.() || "";
   return { error: null, status: 200, text };
 }
 
 async function extractTasteSignals(messages: { role: string; content: string }[], userId: string) {
   try {
     if (messages.length < 1) return;
-    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
-    if (!GEMINI_API_KEY) return;
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) return;
 
     const recentMessages = messages.slice(-8);
     const conversation = recentMessages.map((m) => `${m.role}: ${m.content}`).join("\n");
@@ -88,22 +81,25 @@ Responda APENAS em JSON válido:
 O campo "blocked_elements" deve conter APENAS coisas que o usuário disse EXPLICITAMENTE que NÃO QUER ver, não suporta, tem medo ou nojo. Exemplos: "tenho medo de aranha", "odeio palhaço", "não suporto violência gratuita".
 Se nada, retorne {"signals": [], "blocked_elements": []}`;
 
-    const url = `${GEMINI_BASE}/${GEMINI_MODEL_LIGHT}:generateContent?key=${GEMINI_API_KEY}`;
-    const resp = await fetch(url, {
+    const resp = await fetch(LOVABLE_AI_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.3, maxOutputTokens: 600, responseMimeType: "application/json" },
+        model: LOVABLE_MODEL_LIGHT,
+        messages: [{ role: "user", content: prompt }],
+        response_format: { type: "json_object" },
       }),
     });
 
     if (!resp.ok) {
-      console.error("Gemini extract failed:", resp.status, await resp.text());
+      console.error("Lovable AI extract failed:", resp.status, await resp.text());
       return;
     }
     const data = await resp.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    const text: string | undefined = data?.choices?.[0]?.message?.content;
     if (!text) return;
 
     let jsonStr = text;
@@ -157,8 +153,8 @@ serve(async (req) => {
 
   try {
     const { messages, mode, stream = true } = await req.json();
-    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
-    if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY is not configured");
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
     const isOnboarding = mode === "onboarding";
 
@@ -225,124 +221,23 @@ MODO RECOMENDAÇÃO:
 REGRAS GERAIS: Sem notas de IMDb/RT. Sem inventar filmes. Sem textão.`;
     }
 
-    if (!stream) {
-      const result = await generateGeminiResponse(messages, systemPrompt, GEMINI_API_KEY);
-      if (result.error) {
-        return new Response(JSON.stringify({ error: result.error }), {
-          status: result.status,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      if (shouldExtract && result.text) {
-        const allMsgs = [...messages, { role: "assistant", content: result.text }];
-        await extractTasteSignals(allMsgs, userId!);
-      }
-
-      return new Response(JSON.stringify({ content: result.text }), {
-        status: 200,
+    // Use Lovable AI Gateway (non-streaming for stability with supabase.functions.invoke)
+    const result = await callLovableAI(messages, systemPrompt, LOVABLE_API_KEY);
+    if (result.error) {
+      return new Response(JSON.stringify({ error: result.error }), {
+        status: result.status,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Direct call to Google Gemini with streaming (SSE)
-    const { systemInstruction, contents } = buildGeminiContents(messages, systemPrompt);
-    const url = `${GEMINI_BASE}/${GEMINI_MODEL_STREAM}:streamGenerateContent?alt=sse&key=${GEMINI_API_KEY}`;
-
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        systemInstruction,
-        contents,
-        generationConfig: { temperature: 0.8, maxOutputTokens: 1500 },
-      }),
-    });
-
-    if (!response.ok) {
-      const t = await response.text();
-      console.error("Gemini error:", response.status, t);
-      const status = response.status === 429 ? 429 : response.status === 403 ? 402 : 500;
-      const message =
-        status === 429
-          ? "Limite da API do Google atingido. Tente em alguns segundos."
-          : status === 402
-            ? "Chave da API do Gemini sem quota ou inválida."
-            : "Erro no serviço de IA do Google.";
-      return new Response(JSON.stringify({ error: message }), {
-        status,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    if (shouldExtract && result.text) {
+      const allMsgs = [...messages, { role: "assistant", content: result.text }];
+      await extractTasteSignals(allMsgs, userId!);
     }
 
-    // Convert Gemini SSE to OpenAI-compatible SSE format that the frontend already parses
-    const { readable, writable } = new TransformStream();
-    const writer = writable.getWriter();
-    const encoder = new TextEncoder();
-
-    (async () => {
-      let fullResponse = "";
-      try {
-        const reader = response.body!.getReader();
-        const decoder = new TextDecoder();
-        let buffer = "";
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-
-          let nl: number;
-          while ((nl = buffer.indexOf("\n")) !== -1) {
-            const line = buffer.slice(0, nl).replace(/\r$/, "");
-            buffer = buffer.slice(nl + 1);
-            if (!line.startsWith("data: ")) continue;
-            const jsonStr = line.slice(6).trim();
-            if (!jsonStr) continue;
-            try {
-              const parsed = JSON.parse(jsonStr);
-              const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
-              if (text) {
-                fullResponse += text;
-                // Re-emit in OpenAI-compatible delta format
-                const chunk = {
-                  choices: [{ index: 0, delta: { content: text, role: "assistant" } }],
-                };
-                await writer.write(encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`));
-              }
-            } catch { /* skip */ }
-          }
-        }
-
-        // Final flush
-        if (buffer.trim().startsWith("data: ")) {
-          const jsonStr = buffer.trim().slice(6).trim();
-          try {
-            const parsed = JSON.parse(jsonStr);
-            const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
-            if (text) {
-              fullResponse += text;
-              const chunk = { choices: [{ index: 0, delta: { content: text, role: "assistant" } }] };
-              await writer.write(encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`));
-            }
-          } catch { /* skip */ }
-        }
-
-        await writer.write(encoder.encode("data: [DONE]\n\n"));
-
-        if (shouldExtract && fullResponse) {
-          const allMsgs = [...messages, { role: "assistant", content: fullResponse }];
-          await extractTasteSignals(allMsgs, userId!);
-        }
-      } catch (e) {
-        console.error("Stream error:", e);
-      } finally {
-        await writer.close();
-      }
-    })();
-
-    return new Response(readable, {
-      headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+    return new Response(JSON.stringify({ content: result.text }), {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
     console.error("chat error:", e);
