@@ -17,14 +17,24 @@ export async function streamChat({
 }) {
   const { data: sessionData } = await supabase.auth.getSession();
   const accessToken = sessionData?.session?.access_token;
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const publishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-  const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-  const resp = await fetch(`https://${projectId}.supabase.co/functions/v1/chat`, {
+  if (!supabaseUrl || !publishableKey) {
+    onError?.("Configuração do app incompleta para conectar com a IA");
+    onDone();
+    return;
+  }
+
+  const resp = await fetch(`${supabaseUrl}/functions/v1/chat`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      Accept: "text/event-stream",
+      apikey: publishableKey,
+      Authorization: `Bearer ${accessToken || publishableKey}`,
     },
+    cache: "no-store",
     body: JSON.stringify({ messages, ...(mode ? { mode } : {}) }),
   });
 
