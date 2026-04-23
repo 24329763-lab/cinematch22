@@ -170,8 +170,8 @@ serve(async (req) => {
       });
     }
 
-    // Use Gemini to generate themed sections
-    const aiPrompt = `Você é um curador de cinema. Com base no perfil de gosto do usuário, crie 5 seções de filmes para uma home personalizada.
+    // Use Gemini to generate themed sections (mix of movies + TV)
+    const aiPrompt = `Você é um curador de cinema e séries de TV. Com base no perfil de gosto do usuário, crie 5 seções para uma home personalizada. Misture filmes E séries — não foque só em filmes.
 
 PERFIL DO USUÁRIO:
 Bio: ${tasteBio || "Não informado"}
@@ -179,17 +179,22 @@ Sinais de gosto: ${tasteContext || "Poucos dados ainda"}
 Elementos bloqueados (NUNCA recomendar): ${blockedElements.join(", ") || "Nenhum"}
 
 Para cada seção, defina:
-- title: nome criativo e mood-aware (ex: "Para um dia chuvoso", "Adrenalina pura")
+- title: nome criativo e mood-aware (ex: "Para um dia chuvoso", "Maratonas viciantes")
 - subtitle: uma frase curta
 - icon: um de [heart, flame, compass, star, trending, clock, globe, sparkles]
-- tmdb_query: parâmetros TMDB (with_genres IDs separados por vírgula, sort_by, vote_average.gte, primary_release_date.gte etc)
+- media_type: "movie" para filmes OU "tv" para séries de TV
+- tmdb_query: parâmetros TMDB (with_genres IDs separados por vírgula, sort_by, vote_average.gte, primary_release_date.gte para filmes ou first_air_date.gte para TV, etc)
 
-Gêneros TMDB IDs: 28=Ação, 12=Aventura, 16=Animação, 35=Comédia, 80=Crime, 99=Documentário, 18=Drama, 10751=Família, 14=Fantasia, 36=História, 27=Terror, 10402=Música, 9648=Mistério, 10749=Romance, 878=Ficção Científica, 53=Thriller, 10752=Guerra, 37=Faroeste
+Pelo menos 2 das 5 seções DEVEM ser séries de TV (media_type: "tv").
+
+Gêneros TMDB para filmes: 28=Ação, 12=Aventura, 16=Animação, 35=Comédia, 80=Crime, 99=Documentário, 18=Drama, 10751=Família, 14=Fantasia, 36=História, 27=Terror, 10402=Música, 9648=Mistério, 10749=Romance, 878=Ficção Científica, 53=Thriller, 10752=Guerra, 37=Faroeste
+Gêneros TMDB para TV: 10759=Ação&Aventura, 16=Animação, 35=Comédia, 80=Crime, 99=Documentário, 18=Drama, 10751=Família, 10762=Kids, 9648=Mistério, 10763=News, 10764=Reality, 10765=Sci-Fi&Fantasia, 10766=Soap, 10767=Talk, 10768=Guerra&Política, 37=Faroeste
 
 Responda APENAS JSON:
 {
   "sections": [
-    {"title": "...", "subtitle": "...", "icon": "heart", "tmdb_query": {"with_genres": "18,10749", "sort_by": "vote_average.desc", "vote_average.gte": "7"}}
+    {"title": "...", "subtitle": "...", "icon": "heart", "media_type": "movie", "tmdb_query": {"with_genres": "18,10749", "sort_by": "vote_average.desc", "vote_average.gte": "7"}},
+    {"title": "...", "subtitle": "...", "icon": "trending", "media_type": "tv", "tmdb_query": {"with_genres": "18", "sort_by": "vote_average.desc", "vote_average.gte": "7.5"}}
   ],
   "taste_summary": "Uma frase resumindo o gosto do usuário"
 }`;
@@ -203,9 +208,10 @@ Responda APENAS JSON:
       console.error("Gemini parse error, using fallback themes:", e);
       parsed = {
         sections: [
-          { title: "Para Você", subtitle: "Baseado no seu gosto", icon: "star", tmdb_query: { sort_by: "vote_average.desc", "vote_average.gte": "7.5", "vote_count.gte": "300" } },
-          { title: "Novidades", subtitle: "Lançamentos recentes", icon: "sparkles", tmdb_query: { sort_by: "primary_release_date.desc", "vote_count.gte": "50" } },
-          { title: "Cinema Que Faz Pensar", subtitle: "Drama e profundidade", icon: "compass", tmdb_query: { with_genres: "18", sort_by: "vote_average.desc", "vote_average.gte": "7.5" } },
+          { title: "Para Você", subtitle: "Baseado no seu gosto", icon: "star", media_type: "movie", tmdb_query: { sort_by: "vote_average.desc", "vote_average.gte": "7.5", "vote_count.gte": "300" } },
+          { title: "Séries Pra Maratonar", subtitle: "Histórias que te prendem", icon: "trending", media_type: "tv", tmdb_query: { sort_by: "vote_average.desc", "vote_average.gte": "8", "vote_count.gte": "200" } },
+          { title: "Novidades", subtitle: "Lançamentos recentes", icon: "sparkles", media_type: "movie", tmdb_query: { sort_by: "primary_release_date.desc", "vote_count.gte": "50" } },
+          { title: "Cinema Que Faz Pensar", subtitle: "Drama e profundidade", icon: "compass", media_type: "movie", tmdb_query: { with_genres: "18", sort_by: "vote_average.desc", "vote_average.gte": "7.5" } },
         ],
         taste_summary: null,
       };
@@ -214,7 +220,7 @@ Responda APENAS JSON:
     const aiSections = parsed.sections || [];
     const tasteSummary = parsed.taste_summary || null;
 
-    // For each section: fetch a LARGE pool from TMDB (3 pages = ~60 movies), then filter blocked, then take 12
+    // For each section: fetch from TMDB (movie or tv discover), then filter blocked, then take 12
     const tmdbPromises = aiSections.map(async (section: any) => {
       try {
         const params: Record<string, string> = {};
@@ -225,13 +231,14 @@ Responda APENAS JSON:
         }
         if (!params.sort_by) params.sort_by = "popularity.desc";
 
-        const pool = await fetchTMDBPool("/discover/movie", params, 3);
+        const discoverPath = section.media_type === "tv" ? "/discover/tv" : "/discover/movie";
+        const pool = await fetchTMDBPool(discoverPath, params, 3);
         const mapped = dedupeById(pool).map(mapTMDBMovie).filter((m) => m.posterUrl);
         const filtered = filterBlocked(mapped, blockedElements);
-        return { ...section, movies: filtered.slice(0, 12), tmdb_query: undefined };
+        return { ...section, movies: filtered.slice(0, 12), tmdb_query: undefined, media_type: undefined };
       } catch (e) {
         console.error(`TMDB fetch error for section ${section.title}:`, e);
-        return { ...section, movies: [], tmdb_query: undefined };
+        return { ...section, movies: [], tmdb_query: undefined, media_type: undefined };
       }
     });
 
