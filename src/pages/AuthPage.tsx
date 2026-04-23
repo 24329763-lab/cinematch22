@@ -15,13 +15,19 @@ const AuthPage = () => {
 
   const handleGoogle = async () => {
     setLoading(true);
-    const { error } = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: window.location.origin,
-    });
-    if (error) {
-      toast({ variant: "destructive", title: "Erro", description: String(error) });
+    try {
+      const { error } = await lovable.auth.signInWithOAuth("google", {
+        redirect_uri: `${window.location.origin}/`,
+        extraParams: { prompt: "select_account" },
+      });
+      if (error) {
+        throw error;
+      }
+    } catch (error) {
+      toast({ variant: "destructive", title: "Erro", description: error instanceof Error ? error.message : String(error) });
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleEmail = async (e: React.FormEvent) => {
