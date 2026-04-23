@@ -2,8 +2,6 @@ import { supabase } from "@/integrations/supabase/client";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
-const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
-
 export async function streamChat({
   messages,
   mode,
@@ -20,7 +18,8 @@ export async function streamChat({
   const { data: sessionData } = await supabase.auth.getSession();
   const accessToken = sessionData?.session?.access_token;
 
-  const resp = await fetch(CHAT_URL, {
+  const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+  const resp = await fetch(`https://${projectId}.supabase.co/functions/v1/chat`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
