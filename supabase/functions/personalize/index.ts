@@ -304,11 +304,15 @@ Responda APENAS JSON:
   } catch (e) {
     console.error("Personalize error:", e);
     try {
-      const trending = await fetchTMDBPool("/trending/movie/week", {}, 2);
-      const popular = await fetchTMDBPool("/movie/popular", {}, 2);
+      const [trendingMv, popularMv, trendingTv] = await Promise.all([
+        fetchTMDBPool("/trending/movie/week", {}, 2),
+        fetchTMDBPool("/movie/popular", {}, 2),
+        fetchTMDBPool("/trending/tv/week", {}, 2),
+      ]);
       const sections = [
-        { key: "trending", title: "Em Alta", subtitle: "Tendências da semana", icon: "flame", movies: dedupeById(trending).slice(0, 12).map(mapTMDBMovie) },
-        { key: "popular", title: "Populares", subtitle: "Os mais assistidos", icon: "star", movies: dedupeById(popular).slice(0, 12).map(mapTMDBMovie) },
+        { key: "trending", title: "Filmes em Alta", subtitle: "Tendências da semana", icon: "flame", movies: dedupeById(trendingMv).slice(0, 12).map(mapTMDBMovie) },
+        { key: "trending_tv", title: "Séries em Alta", subtitle: "As séries do momento", icon: "trending", movies: dedupeById(trendingTv).slice(0, 12).map(mapTMDBMovie) },
+        { key: "popular", title: "Filmes Populares", subtitle: "Os mais assistidos", icon: "star", movies: dedupeById(popularMv).slice(0, 12).map(mapTMDBMovie) },
       ];
       return new Response(JSON.stringify({ sections, taste_summary: null }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
