@@ -40,20 +40,24 @@ serve(async (req) => {
           const searchTerms = extractSearchTerms(rawTitle);
           
           for (const term of searchTerms) {
-            // Try pt-BR first, then en-US
+            // Try movie + TV search across pt-BR and en-US
             for (const lang of ["pt-BR", "en-US"]) {
-              const url = `${TMDB_BASE}/search/movie?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(term)}&language=${lang}&page=1`;
-              const resp = await fetch(url);
-              const data = await resp.json();
-              const movie = data.results?.[0];
-              if (movie?.poster_path) {
-                return {
-                  title: rawTitle,
-                  posterUrl: `${IMG_BASE}${movie.poster_path}`,
-                  year: movie.release_date ? parseInt(movie.release_date.slice(0, 4)) : null,
-                  overview: movie.overview || null,
-                  tmdbId: movie.id,
-                };
+              for (const kind of ["movie", "tv"] as const) {
+                const url = `${TMDB_BASE}/search/${kind}?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(term)}&language=${lang}&page=1`;
+                const resp = await fetch(url);
+                const data = await resp.json();
+                const item = data.results?.[0];
+                if (item?.poster_path) {
+                  const dateField = kind === "tv" ? item.first_air_date : item.release_date;
+                  return {
+                    title: rawTitle,
+                    posterUrl: `${IMG_BASE}${item.poster_path}`,
+                    year: dateField ? parseInt(dateField.slice(0, 4)) : null,
+                    overview: item.overview || null,
+                    tmdbId: item.id,
+                    mediaType: kind,
+                  };
+                }
               }
             }
           }

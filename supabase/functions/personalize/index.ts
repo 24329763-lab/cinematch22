@@ -32,15 +32,19 @@ async function fetchTMDBPool(path: string, params: Record<string, string> = {}, 
 }
 
 function mapTMDBMovie(m: any): any {
+  const isTV = !!(m.first_air_date || m.name) && !m.title;
   return {
-    id: `tmdb-${m.id}`,
-    title: m.title,
-    year: m.release_date ? parseInt(m.release_date.slice(0, 4)) : null,
+    id: `tmdb-${isTV ? "tv" : "mv"}-${m.id}`,
+    title: m.title || m.name,
+    year: (m.release_date || m.first_air_date)
+      ? parseInt((m.release_date || m.first_air_date).slice(0, 4))
+      : null,
     rating: m.vote_average ? parseFloat(m.vote_average.toFixed(1)) : null,
     posterUrl: m.poster_path ? `${IMG_BASE}${m.poster_path}` : null,
     description: m.overview || "",
     genres: m.genre_ids || [],
     platforms: [],
+    mediaType: isTV ? "tv" : "movie",
   };
 }
 
@@ -102,17 +106,19 @@ serve(async (req) => {
       userId = user?.id || null;
     }
 
-    // Anonymous → return rich TMDB fallback (3 pages each = lots of variety)
+    // Anonymous → return rich TMDB fallback (movies + TV)
     if (!userId) {
-      const [trending, popular, topRated] = await Promise.all([
+      const [trendingMv, popularMv, trendingTv, popularTv] = await Promise.all([
         fetchTMDBPool("/trending/movie/week", {}, 2),
         fetchTMDBPool("/movie/popular", {}, 2),
-        fetchTMDBPool("/movie/top_rated", {}, 2),
+        fetchTMDBPool("/trending/tv/week", {}, 2),
+        fetchTMDBPool("/tv/popular", {}, 2),
       ]);
       const sections = [
-        { key: "trending", title: "Em Alta Esta Semana", subtitle: "O que todo mundo está assistindo", icon: "flame", movies: dedupeById(trending).slice(0, 12).map(mapTMDBMovie) },
-        { key: "popular", title: "Populares", subtitle: "Os mais assistidos", icon: "star", movies: dedupeById(popular).slice(0, 12).map(mapTMDBMovie) },
-        { key: "top_rated", title: "Mais Bem Avaliados", subtitle: "Clássicos e favoritos", icon: "heart", movies: dedupeById(topRated).slice(0, 12).map(mapTMDBMovie) },
+        { key: "trending", title: "Em Alta Esta Semana", subtitle: "Filmes que todo mundo está vendo", icon: "flame", movies: dedupeById(trendingMv).slice(0, 12).map(mapTMDBMovie) },
+        { key: "trending_tv", title: "Séries em Alta", subtitle: "As séries do momento", icon: "trending", movies: dedupeById(trendingTv).slice(0, 12).map(mapTMDBMovie) },
+        { key: "popular", title: "Filmes Populares", subtitle: "Os mais assistidos", icon: "star", movies: dedupeById(popularMv).slice(0, 12).map(mapTMDBMovie) },
+        { key: "popular_tv", title: "Séries Populares", subtitle: "Maratonas que valem a pena", icon: "heart", movies: dedupeById(popularTv).slice(0, 12).map(mapTMDBMovie) },
       ];
       return new Response(JSON.stringify({ sections, taste_summary: null }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -145,28 +151,27 @@ serve(async (req) => {
     const tasteBio = profile?.taste_bio || "";
     const tasteContext = signals.slice(0, 50).map((s: any) => `${s.signal_type} ${s.category}: ${s.value}`).join(", ");
 
-    // No taste data → rich TMDB fallback
+    // No taste data → rich TMDB fallback (movies + TV)
     if (!tasteBio && signals.length === 0) {
-      const [trending, popular, topRated] = await Promise.all([
+      const [trendingMv, popularMv, trendingTv, popularTv] = await Promise.all([
         fetchTMDBPool("/trending/movie/week", {}, 2),
         fetchTMDBPool("/movie/popular", {}, 2),
-        fetchTMDBPool("/movie/top_rated", {}, 2),
+        fetchTMDBPool("/trending/tv/week", {}, 2),
+        fetchTMDBPool("/tv/popular", {}, 2),
       ]);
-      const filtTrending = filterBlocked(dedupeById(trending).map(mapTMDBMovie), blockedElements);
-      const filtPopular = filterBlocked(dedupeById(popular).map(mapTMDBMovie), blockedElements);
-      const filtTop = filterBlocked(dedupeById(topRated).map(mapTMDBMovie), blockedElements);
       const sections = [
-        { key: "trending", title: "Em Alta Esta Semana", subtitle: "O que todo mundo está assistindo", icon: "flame", movies: filtTrending.slice(0, 12) },
-        { key: "popular", title: "Populares", subtitle: "Os mais assistidos", icon: "star", movies: filtPopular.slice(0, 12) },
-        { key: "top_rated", title: "Mais Bem Avaliados", subtitle: "Clássicos e favoritos", icon: "heart", movies: filtTop.slice(0, 12) },
+        { key: "trending", title: "Em Alta Esta Semana", subtitle: "Filmes que todo mundo está vendo", icon: "flame", movies: filterBlocked(dedupeById(trendingMv).map(mapTMDBMovie), blockedElements).slice(0, 12) },
+        { key: "trending_tv", title: "Séries em Alta", subtitle: "As séries do momento", icon: "trending", movies: filterBlocked(dedupeById(trendingTv).map(mapTMDBMovie), blockedElements).slice(0, 12) },
+        { key: "popular", title: "Filmes Populares", subtitle: "Os mais assistidos", icon: "star", movies: filterBlocked(dedupeById(popularMv).map(mapTMDBMovie), blockedElements).slice(0, 12) },
+        { key: "popular_tv", title: "Séries Populares", subtitle: "Maratonas que valem a pena", icon: "heart", movies: filterBlocked(dedupeById(popularTv).map(mapTMDBMovie), blockedElements).slice(0, 12) },
       ];
       return new Response(JSON.stringify({ sections, taste_summary: null }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Use Gemini to generate themed sections
-    const aiPrompt = `Você é um curador de cinema. Com base no perfil de gosto do usuário, crie 5 seções de filmes para uma home personalizada.
+    // Use Gemini to generate themed sections (mix of movies + TV)
+    const aiPrompt = `Você é um curador de cinema e séries de TV. Com base no perfil de gosto do usuário, crie 5 seções para uma home personalizada. Misture filmes E séries — não foque só em filmes.
 
 PERFIL DO USUÁRIO:
 Bio: ${tasteBio || "Não informado"}
@@ -174,17 +179,22 @@ Sinais de gosto: ${tasteContext || "Poucos dados ainda"}
 Elementos bloqueados (NUNCA recomendar): ${blockedElements.join(", ") || "Nenhum"}
 
 Para cada seção, defina:
-- title: nome criativo e mood-aware (ex: "Para um dia chuvoso", "Adrenalina pura")
+- title: nome criativo e mood-aware (ex: "Para um dia chuvoso", "Maratonas viciantes")
 - subtitle: uma frase curta
 - icon: um de [heart, flame, compass, star, trending, clock, globe, sparkles]
-- tmdb_query: parâmetros TMDB (with_genres IDs separados por vírgula, sort_by, vote_average.gte, primary_release_date.gte etc)
+- media_type: "movie" para filmes OU "tv" para séries de TV
+- tmdb_query: parâmetros TMDB (with_genres IDs separados por vírgula, sort_by, vote_average.gte, primary_release_date.gte para filmes ou first_air_date.gte para TV, etc)
 
-Gêneros TMDB IDs: 28=Ação, 12=Aventura, 16=Animação, 35=Comédia, 80=Crime, 99=Documentário, 18=Drama, 10751=Família, 14=Fantasia, 36=História, 27=Terror, 10402=Música, 9648=Mistério, 10749=Romance, 878=Ficção Científica, 53=Thriller, 10752=Guerra, 37=Faroeste
+Pelo menos 2 das 5 seções DEVEM ser séries de TV (media_type: "tv").
+
+Gêneros TMDB para filmes: 28=Ação, 12=Aventura, 16=Animação, 35=Comédia, 80=Crime, 99=Documentário, 18=Drama, 10751=Família, 14=Fantasia, 36=História, 27=Terror, 10402=Música, 9648=Mistério, 10749=Romance, 878=Ficção Científica, 53=Thriller, 10752=Guerra, 37=Faroeste
+Gêneros TMDB para TV: 10759=Ação&Aventura, 16=Animação, 35=Comédia, 80=Crime, 99=Documentário, 18=Drama, 10751=Família, 10762=Kids, 9648=Mistério, 10763=News, 10764=Reality, 10765=Sci-Fi&Fantasia, 10766=Soap, 10767=Talk, 10768=Guerra&Política, 37=Faroeste
 
 Responda APENAS JSON:
 {
   "sections": [
-    {"title": "...", "subtitle": "...", "icon": "heart", "tmdb_query": {"with_genres": "18,10749", "sort_by": "vote_average.desc", "vote_average.gte": "7"}}
+    {"title": "...", "subtitle": "...", "icon": "heart", "media_type": "movie", "tmdb_query": {"with_genres": "18,10749", "sort_by": "vote_average.desc", "vote_average.gte": "7"}},
+    {"title": "...", "subtitle": "...", "icon": "trending", "media_type": "tv", "tmdb_query": {"with_genres": "18", "sort_by": "vote_average.desc", "vote_average.gte": "7.5"}}
   ],
   "taste_summary": "Uma frase resumindo o gosto do usuário"
 }`;
@@ -198,9 +208,10 @@ Responda APENAS JSON:
       console.error("Gemini parse error, using fallback themes:", e);
       parsed = {
         sections: [
-          { title: "Para Você", subtitle: "Baseado no seu gosto", icon: "star", tmdb_query: { sort_by: "vote_average.desc", "vote_average.gte": "7.5", "vote_count.gte": "300" } },
-          { title: "Novidades", subtitle: "Lançamentos recentes", icon: "sparkles", tmdb_query: { sort_by: "primary_release_date.desc", "vote_count.gte": "50" } },
-          { title: "Cinema Que Faz Pensar", subtitle: "Drama e profundidade", icon: "compass", tmdb_query: { with_genres: "18", sort_by: "vote_average.desc", "vote_average.gte": "7.5" } },
+          { title: "Para Você", subtitle: "Baseado no seu gosto", icon: "star", media_type: "movie", tmdb_query: { sort_by: "vote_average.desc", "vote_average.gte": "7.5", "vote_count.gte": "300" } },
+          { title: "Séries Pra Maratonar", subtitle: "Histórias que te prendem", icon: "trending", media_type: "tv", tmdb_query: { sort_by: "vote_average.desc", "vote_average.gte": "8", "vote_count.gte": "200" } },
+          { title: "Novidades", subtitle: "Lançamentos recentes", icon: "sparkles", media_type: "movie", tmdb_query: { sort_by: "primary_release_date.desc", "vote_count.gte": "50" } },
+          { title: "Cinema Que Faz Pensar", subtitle: "Drama e profundidade", icon: "compass", media_type: "movie", tmdb_query: { with_genres: "18", sort_by: "vote_average.desc", "vote_average.gte": "7.5" } },
         ],
         taste_summary: null,
       };
@@ -209,7 +220,7 @@ Responda APENAS JSON:
     const aiSections = parsed.sections || [];
     const tasteSummary = parsed.taste_summary || null;
 
-    // For each section: fetch a LARGE pool from TMDB (3 pages = ~60 movies), then filter blocked, then take 12
+    // For each section: fetch from TMDB (movie or tv discover), then filter blocked, then take 12
     const tmdbPromises = aiSections.map(async (section: any) => {
       try {
         const params: Record<string, string> = {};
@@ -220,22 +231,23 @@ Responda APENAS JSON:
         }
         if (!params.sort_by) params.sort_by = "popularity.desc";
 
-        const pool = await fetchTMDBPool("/discover/movie", params, 3);
+        const discoverPath = section.media_type === "tv" ? "/discover/tv" : "/discover/movie";
+        const pool = await fetchTMDBPool(discoverPath, params, 3);
         const mapped = dedupeById(pool).map(mapTMDBMovie).filter((m) => m.posterUrl);
         const filtered = filterBlocked(mapped, blockedElements);
-        return { ...section, movies: filtered.slice(0, 12), tmdb_query: undefined };
+        return { ...section, movies: filtered.slice(0, 12), tmdb_query: undefined, media_type: undefined };
       } catch (e) {
         console.error(`TMDB fetch error for section ${section.title}:`, e);
-        return { ...section, movies: [], tmdb_query: undefined };
+        return { ...section, movies: [], tmdb_query: undefined, media_type: undefined };
       }
     });
 
-    const trendingPromise = fetchTMDBPool("/trending/movie/week", {}, 2)
+    const trendingMoviePromise = fetchTMDBPool("/trending/movie/week", {}, 2)
       .then((pool) => {
         const movies = filterBlocked(dedupeById(pool).map(mapTMDBMovie), blockedElements);
         return {
           key: "trending",
-          title: "Em Alta Agora",
+          title: "Filmes em Alta",
           subtitle: "Tendências da semana",
           icon: "flame",
           movies: movies.slice(0, 12),
@@ -243,13 +255,28 @@ Responda APENAS JSON:
       })
       .catch(() => null);
 
-    const [sectionResults, trendingSection] = await Promise.all([
+    const trendingTvPromise = fetchTMDBPool("/trending/tv/week", {}, 2)
+      .then((pool) => {
+        const movies = filterBlocked(dedupeById(pool).map(mapTMDBMovie), blockedElements);
+        return {
+          key: "trending_tv",
+          title: "Séries em Alta",
+          subtitle: "As séries do momento",
+          icon: "trending",
+          movies: movies.slice(0, 12),
+        };
+      })
+      .catch(() => null);
+
+    const [sectionResults, trendingMovieSection, trendingTvSection] = await Promise.all([
       Promise.all(tmdbPromises),
-      trendingPromise,
+      trendingMoviePromise,
+      trendingTvPromise,
     ]);
 
     const finalSections: any[] = [];
-    if (trendingSection && trendingSection.movies.length > 0) finalSections.push(trendingSection);
+    if (trendingMovieSection && trendingMovieSection.movies.length > 0) finalSections.push(trendingMovieSection);
+    if (trendingTvSection && trendingTvSection.movies.length > 0) finalSections.push(trendingTvSection);
     for (const s of sectionResults) {
       if (s.movies && s.movies.length > 0) {
         finalSections.push({ key: s.title.toLowerCase().replace(/\s+/g, "-"), ...s });
@@ -277,11 +304,15 @@ Responda APENAS JSON:
   } catch (e) {
     console.error("Personalize error:", e);
     try {
-      const trending = await fetchTMDBPool("/trending/movie/week", {}, 2);
-      const popular = await fetchTMDBPool("/movie/popular", {}, 2);
+      const [trendingMv, popularMv, trendingTv] = await Promise.all([
+        fetchTMDBPool("/trending/movie/week", {}, 2),
+        fetchTMDBPool("/movie/popular", {}, 2),
+        fetchTMDBPool("/trending/tv/week", {}, 2),
+      ]);
       const sections = [
-        { key: "trending", title: "Em Alta", subtitle: "Tendências da semana", icon: "flame", movies: dedupeById(trending).slice(0, 12).map(mapTMDBMovie) },
-        { key: "popular", title: "Populares", subtitle: "Os mais assistidos", icon: "star", movies: dedupeById(popular).slice(0, 12).map(mapTMDBMovie) },
+        { key: "trending", title: "Filmes em Alta", subtitle: "Tendências da semana", icon: "flame", movies: dedupeById(trendingMv).slice(0, 12).map(mapTMDBMovie) },
+        { key: "trending_tv", title: "Séries em Alta", subtitle: "As séries do momento", icon: "trending", movies: dedupeById(trendingTv).slice(0, 12).map(mapTMDBMovie) },
+        { key: "popular", title: "Filmes Populares", subtitle: "Os mais assistidos", icon: "star", movies: dedupeById(popularMv).slice(0, 12).map(mapTMDBMovie) },
       ];
       return new Response(JSON.stringify({ sections, taste_summary: null }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },

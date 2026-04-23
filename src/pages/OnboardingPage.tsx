@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { streamChat } from "@/lib/chat-stream";
 
 const INITIAL_MESSAGE =
-  "Seja bem-vindo ao CineMatch! ✨\n\nSou seu assistente pessoal de cinema. Pra eu te recomendar os filmes perfeitos, preciso conhecer um pouco do seu gosto.\n\nMe conta: quais são seus 3 filmes favoritos da vida?";
+  "Seja bem-vindo ao CineMatch! ✨\n\nSou seu assistente pessoal de cinema e séries. Pra eu te recomendar os títulos perfeitos, preciso conhecer um pouco do seu gosto.\n\nMe conta: quais são seus 3 filmes ou séries favoritos da vida?";
 
 const OnboardingPage = () => {
   const [messages, setMessages] = useState<any[]>([]);
@@ -32,21 +32,32 @@ const OnboardingPage = () => {
 
   const finishOnboarding = async (chatHistory: string) => {
     try {
+      const safeBio = (chatHistory || "").trim() || "Onboarding finalizado sem detalhes.";
       if (user) {
         const { error } = await supabase
           .from("profiles")
-          .update({ taste_bio: chatHistory, onboarding_complete: true } as any)
+          .update({ taste_bio: safeBio, onboarding_complete: true } as any)
           .eq("user_id", user.id);
-        if (error) throw error;
+        if (error) {
+          console.error("Profile save error:", error);
+          throw error;
+        }
         if (refreshProfile) await refreshProfile();
       } else {
-        sessionStorage.setItem("guest_taste_bio", chatHistory);
+        sessionStorage.setItem("guest_taste_bio", safeBio);
       }
+      // Clear any skip flag so the user goes straight to personalized home
+      sessionStorage.removeItem("onboarding_skipped");
       setOnboardingComplete(true);
-      setTimeout(() => navigate("/"), 1500);
-    } catch (err) {
-      console.error(err);
-      toast({ variant: "destructive", title: "Erro ao salvar perfil" });
+      // Navigate immediately — no delay (avoids appearing stuck/blank)
+      navigate("/", { replace: true });
+    } catch (err: any) {
+      console.error("finishOnboarding failed:", err);
+      toast({
+        variant: "destructive",
+        title: "Erro ao salvar perfil",
+        description: err?.message || "Tente novamente.",
+      });
     }
   };
 
