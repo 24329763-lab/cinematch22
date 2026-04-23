@@ -179,6 +179,8 @@ serve(async (req) => {
     const lastUserMsg = messages.filter((m: any) => m.role === "user").pop()?.content?.toLowerCase() || "";
     const isTasteMode = isOnboarding || /\b(meu gosto|gosto em filmes|que tipo de filme|me conhecer|perfil|preferências|o que eu curto|entender meu gosto|conversar sobre|quero conversar)\b/i.test(lastUserMsg);
 
+    const shouldExtract = !!userId && messages.length >= 1;
+
     let systemPrompt: string;
 
     if (isOnboarding) {
@@ -272,8 +274,6 @@ REGRAS GERAIS: Sem notas de IMDb/RT. Sem inventar filmes. Sem textão.`;
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-
-    const shouldExtract = !!userId && messages.length >= 1;
 
     // Convert Gemini SSE to OpenAI-compatible SSE format that the frontend already parses
     const { readable, writable } = new TransformStream();
