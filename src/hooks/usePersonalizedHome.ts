@@ -81,22 +81,11 @@ export function usePersonalizedHome() {
     inFlightRef.current = true;
     setIsLoading(true);
     try {
-      const { data: session } = await supabase.auth.getSession();
-      const token = session?.session?.access_token;
-      if (!token) return;
-
-      const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/personalize`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({}),
+      const { data, error } = await supabase.functions.invoke<PersonalizedHome>("personalize", {
+        body: {},
       });
 
-      if (!resp.ok) throw new Error("Personalization failed");
-
-      const data: PersonalizedHome = await resp.json();
+      if (error || !data) throw error || new Error("Personalization failed");
 
       if (data.sections && data.sections.length > 0) {
         const sections = data.sections.map((section) => ({
