@@ -23,6 +23,41 @@ function buildGeminiContents(messages: { role: string; content: string }[], syst
   };
 }
 
+async function generateGeminiResponse(
+  messages: { role: string; content: string }[],
+  systemPrompt: string,
+  apiKey: string,
+) {
+  const { systemInstruction, contents } = buildGeminiContents(messages, systemPrompt);
+  const url = `${GEMINI_BASE}/${GEMINI_MODEL_STREAM}:generateContent?key=${apiKey}`;
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      systemInstruction,
+      contents,
+      generationConfig: { temperature: 0.8, maxOutputTokens: 1500 },
+    }),
+  });
+
+  if (!response.ok) {
+    const t = await response.text();
+    console.error("Gemini error:", response.status, t);
+    const status = response.status === 429 ? 429 : response.status === 403 ? 402 : 500;
+    const message =
+      status === 429
+        ? "Limite da API do Google atingido. Tente em alguns segundos."
+        : status === 402
+          ? "Chave da API do Gemini sem quota ou inválida."
+          : "Erro no serviço de IA do Google.";
+    return { error: message, status, text: null as string | null };
+  }
+
+  const data = await response.json();
+  const text = data.candidates?.[0]?.content?.parts?.map((part: any) => part?.text || "").join("")?.trim() || "";
+  return { error: null, status: 200, text };
+}
+
 async function extractTasteSignals(messages: { role: string; content: string }[], userId: string) {
   try {
     if (messages.length < 1) return;
@@ -121,7 +156,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { messages, mode } = await req.json();
+    const { messages, mode, stream = true } = await req.json();
     const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
     if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY is not configured");
 
@@ -143,6 +178,8 @@ serve(async (req) => {
 
     const lastUserMsg = messages.filter((m: any) => m.role === "user").pop()?.content?.toLowerCase() || "";
     const isTasteMode = isOnboarding || /\b(meu gosto|gosto em filmes|que tipo de filme|me conhecer|perfil|preferências|o que eu curto|entender meu gosto|conversar sobre|quero conversar)\b/i.test(lastUserMsg);
+
+    const shouldExtract = !!userId && messages.length >= 1;
 
     let systemPrompt: string;
 
@@ -188,6 +225,26 @@ MODO RECOMENDAÇÃO:
 REGRAS GERAIS: Sem notas de IMDb/RT. Sem inventar filmes. Sem textão.`;
     }
 
+    if (!stream) {
+      const result = await generateGeminiResponse(messages, systemPrompt, GEMINI_API_KEY);
+      if (result.error) {
+        return new Response(JSON.stringify({ error: result.error }), {
+          status: result.status,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      if (shouldExtract && result.text) {
+        const allMsgs = [...messages, { role: "assistant", content: result.text }];
+        await extractTasteSignals(allMsgs, userId!);
+      }
+
+      return new Response(JSON.stringify({ content: result.text }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // Direct call to Google Gemini with streaming (SSE)
     const { systemInstruction, contents } = buildGeminiContents(messages, systemPrompt);
     const url = `${GEMINI_BASE}/${GEMINI_MODEL_STREAM}:streamGenerateContent?alt=sse&key=${GEMINI_API_KEY}`;
@@ -217,8 +274,6 @@ REGRAS GERAIS: Sem notas de IMDb/RT. Sem inventar filmes. Sem textão.`;
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-
-    const shouldExtract = !!userId && messages.length >= 1;
 
     // Convert Gemini SSE to OpenAI-compatible SSE format that the frontend already parses
     const { readable, writable } = new TransformStream();
