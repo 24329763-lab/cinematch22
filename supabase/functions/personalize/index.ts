@@ -32,15 +32,19 @@ async function fetchTMDBPool(path: string, params: Record<string, string> = {}, 
 }
 
 function mapTMDBMovie(m: any): any {
+  const isTV = !!(m.first_air_date || m.name) && !m.title;
   return {
-    id: `tmdb-${m.id}`,
-    title: m.title,
-    year: m.release_date ? parseInt(m.release_date.slice(0, 4)) : null,
+    id: `tmdb-${isTV ? "tv" : "mv"}-${m.id}`,
+    title: m.title || m.name,
+    year: (m.release_date || m.first_air_date)
+      ? parseInt((m.release_date || m.first_air_date).slice(0, 4))
+      : null,
     rating: m.vote_average ? parseFloat(m.vote_average.toFixed(1)) : null,
     posterUrl: m.poster_path ? `${IMG_BASE}${m.poster_path}` : null,
     description: m.overview || "",
     genres: m.genre_ids || [],
     platforms: [],
+    mediaType: isTV ? "tv" : "movie",
   };
 }
 
