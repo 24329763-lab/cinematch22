@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import type { MoviePoster } from "@/lib/tmdb";
+import { supabase } from "@/integrations/supabase/client";
 
 const TMDB_CACHE_KEY = "cinematch_tmdb_fallback";
 const CACHE_TTL = 6 * 60 * 60 * 1000; // 6 hours
@@ -42,23 +43,10 @@ export function useTMDBMovies() {
     const fetchMovies = async () => {
       setIsLoading(true);
       try {
-        const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/personalize`;
-        // Try to get auth token for personalized results
-        let authHeaders: Record<string, string> = {};
-        try {
-          const { supabase } = await import("@/integrations/supabase/client");
-          const { data } = await supabase.auth.getSession();
-          if (data?.session?.access_token) {
-            authHeaders = { Authorization: `Bearer ${data.session.access_token}` };
-          }
-        } catch {}
-        const resp = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", ...authHeaders },
-          body: JSON.stringify({}),
+        const { data, error } = await supabase.functions.invoke<{ sections?: any[] }>("personalize", {
+          body: {},
         });
-        if (!resp.ok) throw new Error("Failed");
-        const data = await resp.json();
+        if (error || !data) throw error || new Error("Failed");
         if (data.sections && data.sections.length > 0) {
           const mapped: TMDBSection[] = data.sections.map((s: any) => ({
             key: s.key,
